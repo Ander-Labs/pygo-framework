@@ -2,139 +2,127 @@
 
 Este documento fija las fronteras técnicas del framework **antes** de escribir
 código. Consolida las 10 decisiones críticas de `PYGO-generalidades/Idea-base.md`
-(PARTE 2) con las elecciones tomadas. Todo lo que no esté aquí se decide
-durante el desarrollo (puntos 11-20 del doc).
+(PARTE 2) con las **mejores opciones escalables** elegidas para PyGo. Todo lo
+que no esté aquí se decide durante el desarrollo (puntos 11-20 del doc).
 
-Objetivo del framework: **monolito modular descapotable** — arranca como un solo
-proceso (Go orquesta Python vía supervisor local) y puede separarse en servicios
-cuando el dev lo necesite, sin reescribir la lógica.
+Objetivo: **monolito modular descapotable** — arranca como un proceso (Go
+orquesta Python vía supervisor local) y se separa en servicios cuando el dev lo
+necesita, sin reescribir la lógica.
+
+Principio rector del DSL: **`.pgo` es isomórfico a Python** (indentación y
+tipos). `gen_py` es casi 1:1; `gen_go` es mecánico desde el AST. Ver
+`DSL-SPEC.md`.
 
 ---
 
-## 1. Protocolo de comunicación Go ↔ Python  ✅ DECIDIDO
+## 1. Protocolo Go ↔ Python  →  **MessagePack + Unix Domain Sockets**  ✅
 
-- **Transporte:** Unix Domain Sockets (en Linux/macOS) con fallback a
-  localhost TCP en Windows (WSL2).
-- **Serialización:** **MessagePack** (binario, sin `.proto`, ~5x más rápido que
-  JSON, fácil de inspeccionar con `msgpacktool`).
-- **Patrón:** Go es el **server** (escucha el socket); Python es el **client**
-  que el supervisor lanza y que se conecta al socket para registrar sus
-  handlers de negocio. Go hace el routing HTTP/HTMX y delega la lógica a
+- **Transporte:** UDS (Linux/macOS), fallback localhost TCP en Windows/WSL2.
+- **Serialización:** **MessagePack** — binario, sin `.proto`, ~5x más rápido
+  que JSON, inspeccionable con `msgpacktool`.
+- **Patrón:** Go = server del socket; Python = client que el supervisor lanza
+  y registra handlers de negocio. Go hace routing HTTP/HTMX y delega lógica a
   Python por el socket.
-- **Por qué no gRPC:** evitamos codegen de `.proto` y acoplamiento; el volumen
-  es I/O-bound (CRM/ERP), no necesitamos streaming tipado pesado.
-- **Descapotable:** si mañana el servicio Python se mueve a otro pod, el socket
-  se reemplaza por TCP y la lógica no cambia. El transporte es un detalle del
-  supervisor, no de la lógica.
+- **Escalabilidad:** el transporte es detalle del supervisor. Para descapotar,
+  el socket UDS se cambia por TCP y la lógica no cambia. Idéntica interfaz.
+- **Por qué no gRPC:** evita codegen `.proto` y acoplamiento; el volumen es
+  I/O-bound (CRM/ERP), no streaming tipado pesado.
 
-## 2. Estructura del AST del transpilador  ✅ DECIDIDO (mínimo Fase 0)
+## 2. AST del transpilador  →  **Visitor pattern desde Fase 0**  ✅
 
-Nodos soportados en Fase 0: `Model`, `Route`, `Handler`, `Function`.
-Cada nodo tiene `Pos()`, `nodeType()`, y campos propios. El AST se construye
-en Go (lexer → parser → AST → validación semántica → generadores Go y Python).
-Ver `DSL-SPEC.md` para la gramática concreta.
+Nodos Fase 0: `Model`, `Route`, `Handler`, `Function`. AST construido en Go.
+Se usa **visitor pattern** desde el inicio (extensibilidad, punto 20 del doc)
+aunque solo haya 2 generadores. Así crecer el DSL no rompe los generadores.
 
-## 3. Sistema de tipos del DSL `.pgo`  ✅ DECIDIDO (mínimo Fase 0)
+## 3. Sistema de tipos  →  **primitivos + `?`/`|None` + FK/Enum/Email/URL/Phone**  ✅
 
-Primitivos: `String, Int, Float, Bool, DateTime, UUID, Decimal`.
-Compuestos: `Array[T], Map[K]V, Optional[T]` (con `?` estilo TS).
-Especiales: `ForeignKey, Enum, Email, URL, Phone`.
-**No** generics, **no** union types (PARTE 2, punto 3).
+Sin generics, sin union types (Fase 0). Mapeo directo: Python `str`/Go `string`,
+etc. Ver `DSL-SPEC.md`.
 
-## 4. Empaquetado de Python en el binario  ✅ DECIDIDO
+## 4. Empaquetado Python  →  **dev interpretado / prod PyOxidizer**  ✅
 
-- **Desarrollo:** Python interpretado en `venv/` junto al binario Go, con
-  hot-reload del proceso Python.
-- **Producción:** **PyOxidizer** embebe Python en el binario único
-  (`pygo build --embed-python`). Sin hot-reload en prod, binario zero-dep.
-- CLI: `pygo dev` (interpretado) / `pygo build --embed-python` (binario).
+- Dev: Python en `venv/`, hot-reload del proceso Python.
+- Prod: **PyOxidizer** embebe Python en binario único (`pygo build --embed-python`).
+- ⚠️ **Testear PyOxidizer temprano (Fase 1)** con C-extensions reales
+  (psycopg/SQLAlchemy) — no dejar para v1.0.
 
-## 5. Mecanismo de hot-reload  ✅ DECIDIDO
+## 5. Hot-reload  →  **fsnotify granular + proceso vivo en error**  ✅
 
-- `fsnotify` (Go) vigila `.pgo`, `.yaml`, `.html`, `.toml`.
-- `.pgo` en `/web` → recompila Go + reinicia proceso Go.
-- `.pgo` en `/core` o `.yaml` → reinicia solo proceso Python.
-- `.html` → hot-swap de templates sin reiniciar.
-- `pygo.toml` → reinicia ambos.
+- `fsnotify` vigila `.pgo/.yaml/.html/.toml`.
+- `.pgo` en `/web` → recompila Go + reinicia Go. `.pgo`/`yaml` en `/core` →
+  reinicia Python. `.html` → hot-swap sin reiniciar. `pygo.toml` → reinicia ambos.
 - Si hay error de compilación, **el proceso vivo se mantiene** y el error se
-  muestra en el browser (no se cae el server).
+  muestra en el browser.
+- ⚠️ Build de Go en cada cambio de `/web` puede ser lento: usar `go build`
+  cacheado o `go run` con watch en dev.
 
-## 6. Manejo de errores cross-language  ✅ DECIDIDO
+## 6. Errores cross-language  →  **struct unificado + request_id**  ✅
 
-Struct unificado:
 ```json
 { "type": "ValidationError", "message": "...", "field": "email",
   "source": "python|go", "stack": "...", "context": {} }
 ```
-Se traduce a respuesta HTTP coherente y se loguea en ambos lados con el mismo
-`request_id`.
+Traducido a HTTP coherente y logueado en ambos lados con el mismo `request_id`.
 
-## 7. Configuración unificada  ✅ DECIDIDO (orden de carga)
+## 7. Config unificada  →  **toml → yaml → module.yaml → env → .env**  ✅
 
-1. `pygo.toml` (raíz)
-2. `config/*.yaml`
-3. `modules/*/module.yaml`
-4. Variables de entorno (override)
-5. `.env` (solo dev)
+- Orden de carga fijado. Schemas validados al arranque.
+- ⚠️ Secrets: `.env` plano en dev está bien; en **prod encriptados at-rest**
+  (punto 15). Definir en Fase 1, no en v1.0, para no filtrar credenciales.
 
-Schemas validados al arranque. Secrets en env/`.env`, encriptados at-rest en
-prod (punto 15, durante desarrollo).
+## 8. Bus de eventos  →  **híbrido memoria/Redis (misma interfaz)**  ✅
 
-## 8. Bus de eventos interno  ✅ DECIDIDO
+Memoria por defecto (monolito). Redis opcional (multi-servidor). Misma interfaz
+de eventos → cambiar backend = descapotar sin tocar lógica.
 
-Híbrido: **memoria por defecto** (monolito), **Redis opcional** (multi-servidor).
-La interfaz es la misma; el backend se elige por config. Sigue el principio
-"ligero pero potente".
+## 9. Migraciones  →  **DSL 90% + SQL 10%**  ✅
 
-## 9. Formato de migraciones  ✅ DECIDIDO
+Auto-gen desde modelos `.pgo` (evita drift). SQL manual para edge cases.
+Portabilidad SQLite (dev) → PostgreSQL (prod) vía DSL.
 
-Híbrido: **DSL para el 90%** (auto-generadas desde modelos `.pgo`), **SQL
-manual para el 10%** edge. Cubre SQLite (dev) → PostgreSQL (prod).
+## 10. Inyección de dependencias  →  **auto-wiring estilo FastAPI, sin container**  ✅
 
-## 10. Inyección de dependencias  ✅ DECIDIDO
-
-Auto-wiring simple estilo FastAPI: `ctx` siempre disponible, servicios
-registrados en `pygo.toml`. **No** container complejo.
+`ctx` siempre disponible; servicios registrados en `pygo.toml`. Sin container
+complejo (preserva DX).
 
 ---
 
-## Reglas rígidas de archivos (del doc, confirmadas)
+## Reglas rígidas de archivos (confirmadas)
 
-| Extensión | Responsabilidad |
+| Ext | Responsabilidad |
 |---|---|
-| `.pgo` | SOLO lógica (handlers, métodos, workers) |
+| `.pgo` | SOLO lógica (handlers, métodos, workers) — sintaxis idéntica a Python |
 | `.yaml` | SOLO declaraciones (modelos simples, config) |
 | `.html` | SOLO vistas (HTMX) |
-| `.toml` | SOLO config del proyecto (`pygo.toml`) |
+| `.toml` | SOLO config (`pygo.toml`) |
 
-Sin excepciones. Esto es lo que hace alineable el código para sub-agentes.
+Sin excepciones. Esto alinea el código para sub-agentes.
 
 ---
 
 ## Stack confirmado
 
-- **Backend:** Go (web/HTMX routing) + Python (lógica/datos).
+- **Backend:** Go (routing/HTMX) + Python (lógica/datos).
 - **Frontend:** HTMX + Tailwind + Alpine.js.
-- **DSL:** `.pgo` (Fase 0, mínimo) + YAML declarativo.
+- **DSL:** `.pgo` isomórfico a Python (Fase 0 mínimo) + YAML declarativo.
 - **DB:** SQLite (dev) → PostgreSQL (prod).
-- **Cache:** memory → Redis (opcional).
-- **Queue:** in-memory → Redis (opcional).
+- **Cache/Queue:** memory → Redis (opcional).
 - **Licencia:** AGPL v3 (core 100% libre).
 
 ---
 
-## Qué está FUERA de alcance hasta PyGo estable
+## Fuera de alcance hasta PyGo estable
 
-PyGo Cloud, PyGo Mobile, PyGo Desktop, Marketplace, MCP Extensions, IDE
-plugins. Se congelan hasta v1.0. El foco es el core + PoC funcional.
+PyGo Cloud, Mobile, Desktop, Marketplace, MCP, IDE plugins. Congelados hasta
+v1.0. Foco: core + PoC funcional.
 
 ---
 
 ## Reutilización de `Ander-Labs/ECC` (biblioteca de consulta)
 
-El repo ECC (clonado localmente) contiene agents/skills/commands/plugins que
-pueden reutilizarse para cubrir huecos de equipo:
-- Skills de codegen / scaffolding → aceleran los generadores del transpiler.
-- Agents de revisión → suplen code review de un equipo grande.
-- Plugins de CI/CD → validación de módulos `.pgo`.
-ECC se usa como **referencia**, no se instala en el framework.
+ECC (clonado local) tiene agents/skills/commands/plugins reutilizables para
+cubrir huecos de equipo:
+- Skills de codegen/scaffolding → aceleran generadores del transpiler.
+- Agents de revisión → suplen code review de equipo grande.
+- Plugins CI/CD → validación de módulos `.pgo`.
+Se usa como **referencia**, no se instala en el framework.
