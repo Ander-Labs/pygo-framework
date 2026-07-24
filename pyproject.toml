@@ -1,0 +1,8 @@
+[project]
+name = "pygo-runtime"
+version = "0.0.1"
+requires-python = ">=3.11"
+dependencies = ["msgpack>=1.0"]
+
+[project.optional-dependencies]
+dev = ["sqlalchemy>=2.0"]

@@ -1,0 +1,140 @@
+// Package ast defines the PyGo `.pgo` abstract syntax tree.
+//
+// The AST uses the visitor pattern from Fase 0 (per ARCHITECTURE.md §2 and
+// DSL-SPEC.md §3) so that new generators can be added without touching the
+// node definitions. Every node implements Node and dispatches through Accept.
+package ast
+
+// Node is the interface implemented by every AST node.
+type Node interface {
+	// Accept dispatches to the appropriate Visit* method on v and returns
+	// whatever the visitor produces (or an error).
+	Accept(v Visitor) (interface{}, error)
+	// node is an unexported marker to keep the Node set closed to this package.
+	node()
+}
+
+// Visitor is implemented by generators (gen_go, gen_py) and any AST consumer.
+type Visitor interface {
+	VisitProgram(n *Program) (interface{}, error)
+	VisitModel(n *ModelNode) (interface{}, error)
+	VisitRoute(n *RouteNode) (interface{}, error)
+	VisitHandler(n *HandlerNode) (interface{}, error)
+	VisitFunction(n *FunctionNode) (interface{}, error)
+	VisitField(n *FieldNode) (interface{}, error)
+}
+
+// TypeRef describes a resolved DSL type reference, e.g. Optional[String],
+// Array[Int], UUID, Email.
+type TypeRef struct {
+	// Name is the base type name (String, Int, UUID, Optional, Array, ...).
+	Name string
+	// Optional is true when the field is nullable (`T?`, `T | None`, or
+	// Optional[T]). When Optional wraps a type, Inner holds the wrapped type.
+	Optional bool
+	// Inner is the element/wrapped type for compound types (Array[T],
+	// Optional[T], Map[K]V uses Inner for V and Key for K).
+	Inner *TypeRef
+	// Key is the key type for Map[K]V.
+	Key *TypeRef
+}
+
+// String renders the type reference back to DSL-ish form (for debugging).
+func (t *TypeRef) String() string {
+	if t == nil {
+		return "<nil>"
+	}
+	s := t.Name
+	if t.Inner != nil {
+		s += "[" + t.Inner.String() + "]"
+	}
+	if t.Optional {
+		s += "?"
+	}
+	return s
+}
+
+// FieldNode is a typed field inside a model, or a parameter in a signature.
+type FieldNode struct {
+	Name    string
+	Type    *TypeRef
+	Default string // raw default expression, empty if none
+	Line    int
+}
+
+func (n *FieldNode) node() {}
+func (n *FieldNode) Accept(v Visitor) (interface{}, error) {
+	return v.VisitField(n)
+}
+
+// ModelNode is a `model` declaration (Go struct + Python ORM class).
+type ModelNode struct {
+	Name   string
+	Fields []*FieldNode
+	Line   int
+}
+
+func (n *ModelNode) node() {}
+func (n *ModelNode) Accept(v Visitor) (interface{}, error) {
+	return v.VisitModel(n)
+}
+
+// RouteNode is a `route METHOD /path -> handler` declaration.
+type RouteNode struct {
+	Method  string // GET, POST, ...
+	Path    string // /hello/:name
+	Handler string // handler name it dispatches to
+	Line    int
+}
+
+func (n *RouteNode) node() {}
+func (n *RouteNode) Accept(v Visitor) (interface{}, error) {
+	return v.VisitRoute(n)
+}
+
+// HandlerNode is a `handler` definition. Its body is emitted almost verbatim
+// to Python (the `.pgo` body IS valid Python).
+type HandlerNode struct {
+	Name       string
+	Params     []*FieldNode
+	ReturnType *TypeRef
+	// Body holds the raw source lines of the handler body, with the block's
+	// leading indentation already stripped to a common base (so gen_py can
+	// re-indent under `def`).
+	Body []string
+	Line int
+}
+
+func (n *HandlerNode) node() {}
+func (n *HandlerNode) Accept(v Visitor) (interface{}, error) {
+	return v.VisitHandler(n)
+}
+
+// FunctionNode is a `function` definition (Python-only utility).
+type FunctionNode struct {
+	Name       string
+	Params     []*FieldNode
+	ReturnType *TypeRef
+	Body       []string
+	Line       int
+}
+
+func (n *FunctionNode) node() {}
+func (n *FunctionNode) Accept(v Visitor) (interface{}, error) {
+	return v.VisitFunction(n)
+}
+
+// Program is the root node holding all top-level declarations in order.
+type Program struct {
+	Models    []*ModelNode
+	Routes    []*RouteNode
+	Handlers  []*HandlerNode
+	Functions []*FunctionNode
+	// Decls preserves original source order of top-level nodes.
+	Decls []Node
+}
+
+func (n *Program) node() {}
+func (n *Program) Accept(v Visitor) (interface{}, error) {
+	return v.VisitProgram(n)
+}

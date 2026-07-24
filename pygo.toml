@@ -1,0 +1,11 @@
+# PyGo project config
+dsl_version = "0.0.1"
+name = "hello-world"
+
+[server]
+host = "127.0.0.1"
+port = 8080
+
+[python]
+interpreter = "python3"
+module = "app.py"

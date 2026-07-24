@@ -1,0 +1,11 @@
+# PyGo PoC — Hello World
+# DSL isomórfico a Python. Transpila a Go (handler stub + route) y Python (modelo + lógica).
+
+model Greeting:
+    id: UUID?
+    name: String
+
+route GET /hello/:name -> hello
+
+handler hello(name: String) -> Greeting:
+    return Greeting(name=name)
