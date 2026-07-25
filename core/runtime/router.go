@@ -32,14 +32,19 @@ func NewRouter() *Router {
 func (r *Router) Mux() *http.ServeMux { return r.mux }
 
 // Handle registers a route. h receives the parsed args map (path params +
-// query) and returns (result, error) by delegating to Python.
+// query) and returns (result, error) by delegating to Python. When auth is
+// true, the request must carry a valid Bearer JWT (native middleware).
 //
 // net/http's ServeMux does not support :param wildcards, so routes containing a
 // ":name" segment are registered on the parent prefix (e.g. "/hello/:id" ->
 // "/hello/") and the param is extracted from the real request path.
-func (r *Router) Handle(method, path string, h func(args map[string]any) (any, error)) {
+func (r *Router) Handle(method, path string, h func(args map[string]any) (any, error), auth bool) {
 	key := method + " " + path
 	registerPath := muxPath(path)
+	handler := h
+	if auth {
+		handler = AuthMiddleware(h)
+	}
 	r.mux.HandleFunc(registerPath, func(w http.ResponseWriter, req *http.Request) {
 		if req.Method != method {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -47,16 +52,21 @@ func (r *Router) Handle(method, path string, h func(args map[string]any) (any, e
 		}
 		args := map[string]any{}
 		extractPathParams(req, path, args)
+		extractAuth(req, args)
 		// Query params.
 		for k, vs := range req.URL.Query() {
 			if len(vs) > 0 {
 				args[k] = vs[0]
 			}
 		}
-		result, err := h(args)
+		result, err := handler(args)
 		if err != nil {
+			status := http.StatusInternalServerError
+			if strings.Contains(err.Error(), "token") || strings.Contains(err.Error(), "bearer") {
+				status = http.StatusUnauthorized
+			}
 			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(status)
 			_, _ = fmt.Fprintf(w, `{"error":%q}`, err.Error())
 			return
 		}

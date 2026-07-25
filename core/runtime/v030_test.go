@@ -28,6 +28,9 @@ func TestV030ORM(t *testing.T) {
 	if err := os.Setenv("PYTHONPATH", repoRoot); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Setenv("PYGO_SOCKET", filepath.Join(t.TempDir(), "pygo.sock")); err != nil {
+		t.Fatal(err)
+	}
 	// Use an isolated DB for the test.
 	dbPath := filepath.Join(t.TempDir(), "pygo_test.db")
 	if err := os.Setenv("PYGO_DB", dbPath); err != nil {
@@ -38,11 +41,11 @@ func TestV030ORM(t *testing.T) {
 	server := NewServer(addr, appPath)
 	server.Router().Handle("POST", "/customers", func(args map[string]any) (any, error) {
 		return CallPython("create_customer", args)
-	})
+	}, false)
 	server.Router().Handle("GET", "/customers/:id", func(args map[string]any) (any, error) {
 		id, _ := args["id"].(string)
 		return CallPython("get_customer", map[string]any{"id": id})
-	})
+	}, false)
 
 	go func() { _ = server.Start() }()
 	defer server.Stop()
@@ -63,6 +66,7 @@ func TestV030ORM(t *testing.T) {
 	if err := json.Unmarshal(b, &created); err != nil {
 		t.Fatalf("create body not json: %s", b)
 	}
+	t.Logf("v0.3.0 raw body: %s", b)
 	if created["name"] != "Maria" {
 		t.Fatalf("expected name=Maria, got %v", created["name"])
 	}

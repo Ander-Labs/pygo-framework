@@ -61,6 +61,11 @@ func runDev(args []string) error {
 	if err := registerHelloRoute(server.Router()); err != nil {
 		return err
 	}
+	// Example of a protected route: requires a valid Bearer JWT.
+	server.Router().Handle("GET", "/me", func(args map[string]any) (any, error) {
+		user, _ := args["_user"].(string)
+		return map[string]any{"user": user}, nil
+	}, true)
 
 	fmt.Printf("dev server ready on http://127.0.0.1%s\n", normalizeAddr(*addr))
 	fmt.Println("dev: try  curl http://127.0.0.1:8080/hello/Anders")
@@ -73,7 +78,7 @@ func registerHelloRoute(r *runtime.Router) error {
 	r.Handle("GET", "/hello/:name", func(args map[string]any) (any, error) {
 		name, _ := args["name"].(string)
 		return runtime.CallPython("hello", map[string]any{"name": name})
-	})
+	}, false)
 	return nil
 }
 

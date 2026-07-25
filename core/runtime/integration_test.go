@@ -27,6 +27,10 @@ func TestPoCHelloWorld(t *testing.T) {
 	if err := os.Setenv("PYTHONPATH", repoRoot); err != nil {
 		t.Fatal(err)
 	}
+	// Unique UDS per test so parallel runs don't collide on /tmp/pygo.sock.
+	if err := os.Setenv("PYGO_SOCKET", filepath.Join(t.TempDir(), "pygo.sock")); err != nil {
+		t.Fatal(err)
+	}
 
 	sup := New(Config{
 		Interpreter: "python3",

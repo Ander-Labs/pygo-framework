@@ -28,6 +28,9 @@ func TestV020HTMX(t *testing.T) {
 	if err := os.Setenv("PYTHONPATH", repoRoot); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Setenv("PYGO_SOCKET", filepath.Join(t.TempDir(), "pygo.sock")); err != nil {
+		t.Fatal(err)
+	}
 
 	const addr = "127.0.0.1:18080"
 	server := NewServer(addr, filepath.Join(appDir, "app_poc.py"))
@@ -39,7 +42,7 @@ func TestV020HTMX(t *testing.T) {
 	server.Router().Handle("GET", "/hello/:name", func(args map[string]any) (any, error) {
 		name, _ := args["name"].(string)
 		return CallPython("hello", map[string]any{"name": name})
-	})
+	}, false)
 
 	go func() {
 		_ = server.Start()

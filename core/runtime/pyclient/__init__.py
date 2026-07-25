@@ -111,20 +111,22 @@ def dispatch(handler: str, args: Dict[str, Any]) -> Dict[str, Any]:
     """Look up and execute a handler, returning a response dict.
 
     The response is always {"result": ..., "error": ...} with exactly one of the
-    two populated.
+    two populated. Args keys prefixed with '_' are Go-side metadata (e.g. _auth,
+    _user) and are stripped before calling the Python handler.
     """
     fn = HANDLERS.get(handler)
     if fn is None:
         return {
             "result": None,
-            "error": make_error(
-                "HandlerNotFound",
-                f"no handler registered for {handler!r}",
-                context={"available": sorted(HANDLERS.keys())},
-            ),
+            "error": {
+                "type": "HandlerNotFound",
+                "message": f"no handler registered for {handler!r}",
+                "source": "python",
+            },
         }
     try:
-        result = fn(**(args or {}))
+        clean = {k: v for k, v in (args or {}).items() if not k.startswith("_")}
+        result = fn(**clean)
         return {"result": _to_wire(result), "error": None}
     except TypeError as exc:
         # Typically a signature mismatch (bad/missing args).

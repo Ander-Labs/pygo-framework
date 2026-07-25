@@ -158,9 +158,9 @@ func (g *GoGenerator) VisitHandler(n *ast.HandlerNode) (interface{}, error) {
 }
 
 func (g *GoGenerator) VisitRoute(n *ast.RouteNode) (interface{}, error) {
-	g.buf.WriteString(fmt.Sprintf("\tr.Handle(%q, %q, func(args map[string]interface{}) (interface{}, error) {\n", n.Method, n.Path))
-	g.buf.WriteString(fmt.Sprintf("\t\treturn Handler_%s(args)\n", n.Handler))
-	g.buf.WriteString("\t})\n")
+	g.buf.WriteString(fmt.Sprintf("	r.Handle(%q, %q, func(args map[string]interface{}) (interface{}, error) {\n", n.Method, n.Path))
+	g.buf.WriteString(fmt.Sprintf("		return Handler_%s(args)\n", n.Handler))
+	g.buf.WriteString("	}, false)\n")
 	return nil, nil
 }
 

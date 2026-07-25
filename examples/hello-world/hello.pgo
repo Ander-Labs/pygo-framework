@@ -1,12 +1,20 @@
-# PyGo PoC v0.3.0 — ORM nativo (sqlite3 stdlib)
+# PyGo example — cubre v0.1 (hello), v0.2 (HTMX), v0.3 (ORM Customer)
+
+model Greeting:
+    id: UUID?
+    name: String
 
 model Customer:
     id: UUID?
     name: String
     email: Email
 
+route GET /hello/:name -> hello
 route POST /customers -> create_customer
 route GET /customers/:id -> get_customer
+
+handler hello(name: String) -> Greeting:
+    return Greeting(name=name)
 
 handler create_customer(name: String, email: Email) -> Customer:
     return Customer.create(name=name, email=email)
