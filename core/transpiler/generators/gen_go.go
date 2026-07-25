@@ -145,34 +145,14 @@ func (g *GoGenerator) VisitField(n *ast.FieldNode) (interface{}, error) {
 }
 
 func (g *GoGenerator) VisitHandler(n *ast.HandlerNode) (interface{}, error) {
-	// Emit a stub that packs {handler, args} and delegates to Python.
-	ret := "interface{}"
-	if n.ReturnType != nil {
-		ret = goType(n.ReturnType)
-	}
+	// Emit a delegate that calls Python over the MessagePack socket and returns
+	// the result as interface{} (the router serializes it to JSON/HTML).
 	g.buf.WriteString(fmt.Sprintf("// Handler_%s delegates to the Python handler %q over the MessagePack socket.\n", n.Name, n.Name))
-	g.buf.WriteString(fmt.Sprintf("func Handler_%s(args map[string]interface{}) (%s, error) {\n", n.Name, ret))
-	g.buf.WriteString("\t// Build the msgpack payload {handler, args}.\n")
-	g.buf.WriteString("\tpayload := map[string]interface{}{\n")
-	g.buf.WriteString(fmt.Sprintf("\t\t\"handler\": %q,\n", n.Name))
-	g.buf.WriteString("\t\t\"args\":    args,\n")
-	g.buf.WriteString("\t}\n")
-	g.buf.WriteString("\t// TODO(runtime-agent): runtime.CallPython must serialize `payload` with\n")
-	g.buf.WriteString("\t// msgpack, write it to the UDS socket, read the response and decode it.\n")
-	g.buf.WriteString("\t// This helper is implemented by the runtime/socket agent.\n")
-	g.buf.WriteString(fmt.Sprintf("\tresp, err := runtime.CallPython(%q, payload)\n", n.Name))
-	if ret == "interface{}" {
-		g.buf.WriteString("\treturn resp, err\n")
-	} else {
-		g.buf.WriteString("\tif err != nil {\n")
-		g.buf.WriteString(fmt.Sprintf("\t\tvar zero %s\n", ret))
-		g.buf.WriteString("\t\treturn zero, err\n")
-		g.buf.WriteString("\t}\n")
-		g.buf.WriteString(fmt.Sprintf("\t// TODO(runtime-agent): decode resp into %s.\n", ret))
-		g.buf.WriteString("\t_ = resp\n")
-		g.buf.WriteString(fmt.Sprintf("\tvar out %s\n", ret))
-		g.buf.WriteString("\treturn out, nil\n")
-	}
+	g.buf.WriteString(fmt.Sprintf("func Handler_%s(args map[string]interface{}) (interface{}, error) {\n", n.Name))
+	g.buf.WriteString("	return runtime.CallPython(\n")
+	g.buf.WriteString(fmt.Sprintf("		%q,\n", n.Name))
+	g.buf.WriteString("		args,\n")
+	g.buf.WriteString("	)\n")
 	g.buf.WriteString("}\n\n")
 	return nil, nil
 }

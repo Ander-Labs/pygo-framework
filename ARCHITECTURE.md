@@ -5,9 +5,23 @@ código. Consolida las 10 decisiones críticas de `PYGO-generalidades/Idea-base.
 (PARTE 2) con las **mejores opciones escalables** elegidas para PyGo. Todo lo
 que no esté aquí se decide durante el desarrollo (puntos 11-20 del doc).
 
-Objetivo: **monolito modular descapotable** — arranca como un proceso (Go
+Objetivo del framework: **monolito modular descapotable** — arranca como un proceso (Go
 orquesta Python vía supervisor local) y se separa en servicios cuando el dev lo
 necesita, sin reescribir la lógica.
+
+## Principio rector: solo lo nativo (ligereza por diseño)
+
+PyGo es **ultra ligero, eficiente, rápido, seguro y simple (DX)**. Por eso:
+
+- **Go:** solo la biblioteca estándar (`net/http`, `database/sql`, `encoding/*`).
+  **CERO frameworks pesados** (no gin, no echo, no ORM gigante). Si lo nativo no
+  basta, se evalúa una lib mínima, nunca un framework pesado.
+- **Python:** `stdlib` + lo mínimo imprescindible (`msgpack`). ORM en Fase 1 se
+  hace sobre `sqlite3`/`psycopg` + `database/sql`, no SQLAlchemy pesado.
+- Cada dependencia se justifica por peso y superficie de ataque, no por comodidad.
+
+Esto es parte del wedge de PyGo: lo que lo diferencia de Django/Rails/Frappe es
+que el core Go no arrastra un runtime pesado.
 
 Principio rector del DSL: **`.pgo` es isomórfico a Python** (indentación y
 tipos). `gen_py` es casi 1:1; `gen_go` es mecánico desde el AST. Ver
