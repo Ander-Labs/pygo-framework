@@ -101,7 +101,7 @@ func (g *PyGenerator) VisitProgram(n *ast.Program) (interface{}, error) {
 
 func (g *PyGenerator) VisitModel(n *ast.ModelNode) (interface{}, error) {
 	g.buf.WriteString(fmt.Sprintf("class %s:\n", n.Name))
-	g.buf.WriteString(fmt.Sprintf("    \"\"\"Generated ORM model from `model %s`.\"\"\"\n\n", n.Name))
+	g.buf.WriteString(fmt.Sprintf("    \"\"\"Generated ORM model from `model %s` (native sqlite3).\"\"\"\n\n", n.Name))
 
 	// Class-level typed attributes.
 	for _, f := range n.Fields {
@@ -123,12 +123,60 @@ func (g *PyGenerator) VisitModel(n *ast.ModelNode) (interface{}, error) {
 	}
 	g.buf.WriteString("\n")
 
-	// find() classmethod (stub for Fase 0 ORM).
+	// Table + columns DDL (DSL 90%: auto-generated from the model).
+	cols := []string{}
+	for _, f := range n.Fields {
+		cols = append(cols, fmt.Sprintf("%q: %q", f.Name, pySQLType(f.Type)))
+	}
+	g.buf.WriteString(fmt.Sprintf("    _table = %q\n", toSnake(n.Name)))
+	g.buf.WriteString(fmt.Sprintf("    _columns = {%s}\n\n", strings.Join(cols, ", ")))
+
+	// create() classmethod: inserts a row and returns the model instance.
+	g.buf.WriteString("    @classmethod\n")
+	g.buf.WriteString("    def create(cls, **fields):\n")
+	g.buf.WriteString("        \"\"\"Insert a row and return the model instance.\"\"\"\n")
+	g.buf.WriteString("        from core.runtime.db import connect, ensure_table\n")
+	g.buf.WriteString("        cols = list(fields.keys())\n")
+	g.buf.WriteString("        placeholders = \", \".join(\"?\" for _ in cols)\n")
+	g.buf.WriteString("        col_names = \", \".join(cols)\n")
+	g.buf.WriteString("        conn = connect()\n")
+	g.buf.WriteString("        ensure_table(conn, cls._table, [\n")
+	g.buf.WriteString("            f\"{name} {typ}\" for name, typ in cls._columns.items()\n")
+	g.buf.WriteString("        ])\n")
+	g.buf.WriteString("        cur = conn.execute(\n")
+	g.buf.WriteString("            f\"INSERT INTO {cls._table} ({col_names}) VALUES ({placeholders})\",\n")
+	g.buf.WriteString("            [fields[c] for c in cols],\n")
+	g.buf.WriteString("        )\n")
+	g.buf.WriteString("        conn.commit()\n")
+	g.buf.WriteString("        row = conn.execute(\n")
+	g.buf.WriteString("            f\"SELECT * FROM {cls._table} WHERE rowid = ?\", (cur.lastrowid,)\n")
+	g.buf.WriteString("        ).fetchone()\n")
+	g.buf.WriteString("        conn.close()\n")
+	g.buf.WriteString("        return cls.row_to_model(row, cur.lastrowid)\n\n")
+
+	// find() classmethod: by id (rowid for Fase 0).
 	g.buf.WriteString("    @classmethod\n")
 	g.buf.WriteString("    def find(cls, id):\n")
-	g.buf.WriteString(fmt.Sprintf("        \"\"\"Look up a %s by id. TODO: wire to the datastore.\"\"\"\n", n.Name))
-	g.buf.WriteString("        raise NotImplementedError(\"ORM find() not implemented in Fase 0\")\n")
-	g.buf.WriteString("\n\n")
+	g.buf.WriteString("        \"\"\"Look up a row by rowid and return the model instance.\"\"\"\n")
+	g.buf.WriteString("        from core.runtime.db import connect\n")
+	g.buf.WriteString("        conn = connect()\n")
+	g.buf.WriteString("        row = conn.execute(\n")
+	g.buf.WriteString("            f\"SELECT * FROM {cls._table} WHERE rowid = ?\", (id,)\n")
+	g.buf.WriteString("        ).fetchone()\n")
+	g.buf.WriteString("        conn.close()\n")
+	g.buf.WriteString("        if row is None:\n")
+	g.buf.WriteString("            return None\n")
+	g.buf.WriteString("        return cls.row_to_model(row, id)\n\n")
+
+	// row_to_model helper.
+	g.buf.WriteString("    @classmethod\n")
+	g.buf.WriteString("    def row_to_model(cls, row, rowid=None):\n")
+	g.buf.WriteString("        if row is None:\n")
+	g.buf.WriteString("            return None\n")
+	g.buf.WriteString("        data = {k: row[k] for k in cls._columns.keys()}\n")
+	g.buf.WriteString("        if data.get(\"id\") is None and rowid is not None:\n")
+	g.buf.WriteString("            data[\"id\"] = rowid\n")
+	g.buf.WriteString("        return cls(**data)\n\n")
 	return nil, nil
 }
 
@@ -180,4 +228,41 @@ func (g *PyGenerator) emitDef(name string, params []*ast.FieldNode, ret *ast.Typ
 		}
 		g.buf.WriteString("    " + ln + "\n")
 	}
+}
+
+// pySQLType maps a DSL TypeRef to a SQLite column type. Native/stdlib only.
+func pySQLType(t *ast.TypeRef) string {
+	if t == nil {
+		return "TEXT"
+	}
+	switch t.Name {
+	case "Int":
+		return "INTEGER"
+	case "Float", "Decimal":
+		return "REAL"
+	case "Bool":
+		return "INTEGER"
+	case "String", "UUID", "Email", "URL", "Phone", "DateTime", "Enum", "ForeignKey":
+		return "TEXT"
+	}
+	return "TEXT"
+}
+
+// toSnake converts CamelCase model names to snake_case table names.
+func toSnake(s string) string {
+	if s == "" {
+		return s
+	}
+	var b strings.Builder
+	for i, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			if i > 0 {
+				b.WriteByte('_')
+			}
+			b.WriteByte(byte(r - 'A' + 'a'))
+		} else {
+			b.WriteByte(byte(r))
+		}
+	}
+	return b.String()
 }

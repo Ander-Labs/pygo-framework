@@ -1,11 +1,15 @@
-# PyGo PoC — Hello World
-# DSL isomórfico a Python. Transpila a Go (handler stub + route) y Python (modelo + lógica).
+# PyGo PoC v0.3.0 — ORM nativo (sqlite3 stdlib)
 
-model Greeting:
+model Customer:
     id: UUID?
     name: String
+    email: Email
 
-route GET /hello/:name -> hello
+route POST /customers -> create_customer
+route GET /customers/:id -> get_customer
 
-handler hello(name: String) -> Greeting:
-    return Greeting(name=name)
+handler create_customer(name: String, email: Email) -> Customer:
+    return Customer.create(name=name, email=email)
+
+handler get_customer(id: Int) -> Customer:
+    return Customer.find(id)
