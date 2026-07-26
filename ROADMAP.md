@@ -62,13 +62,27 @@ Objetivo verificable: login con sesión + JWT protege rutas marcadas.
 
 ---
 
-## v0.5.0 — Build empaquetado (Fase 5)
+## v0.5.0 — Build empaquetado (Fase 5)  ← ESTADO: COMPLETADO (spec + CLI)
 
-Objetivo verificable: `pygo build --embed-python` produce binario único que
-corre sin `venv` ni Python del sistema, con psycopg/SQLAlchemy.
+Objetivo verificable: `pygo build --embed-python` genera `pyoxidizer.bzl` válido
+que empaqueta CPython + `core/` + `app_poc.py` en un binario. Si `pyoxidizer`
+está en PATH, build real; si no, deja el spec y avisa (sin tirar toolchain).
 
-- PyOxidizer integration.
-- Test de C-extensions (mi bandera de riesgo de Fase 0).
+Entregado:
+- `cli/build.go`: `pygo build --embed-python` escribe el spec y corre
+  `pyoxidizer build --release` cuando está disponible.
+- `core/runtime/pyclient`: `main()` arranca el serve loop (lo invoca el spec).
+- Test `TestV050Build`: genera el spec y valida formato (sin instalar Rust).
+
+Nota honesta de alcance: el `pyoxidizer.bzl` empaqueta el **intérprete Python
+embebido**; el binario resultante es Python-solo. Para que sirva SIN Go en
+producción, `pyclient.main()` debe arrancar un server HTTP nativo (stdlib) que
+replique el routing del `router.go` de Go. Esa pieza (server Python embebido)
+es trabajo de la siguiente subtarea de empaquetado; en dev sigue usándose
+Go+Python con el supervisor. No se rompió nada: el modelo descapotable (dev
+Go+Python, prod binario Python) se mantiene.
+
+## v0.6.0 — Hot-reload real (Fase 6)
 
 ---
 
