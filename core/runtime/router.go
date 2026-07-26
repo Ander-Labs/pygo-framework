@@ -108,6 +108,30 @@ func (r *Router) RegisterView(method, path, fragment string) {
 	r.views[method+" "+path] = template.Must(template.New("view").Parse(fragment))
 }
 
+// SetView hot-swaps an HTML fragment for a route without restarting the server.
+// Used by hot-reload when a .html file changes.
+func (r *Router) SetView(method, path, fragment string) {
+	r.views[method+" "+path] = template.Must(template.New("view").Parse(fragment))
+}
+
+// Supervisor returns the underlying Supervisor so callers can Restart() Python
+// on hot-reload of .pgo files.
+func (s *Server) Supervisor() *Supervisor { return s.sup }
+
+// NewServerWithSocket is like NewServer but lets the caller pick the UDS path
+// (used so parallel tests don't collide on the default socket).
+func NewServerWithSocket(addr, socketPath, pyModule string, pyExtra ...string) *Server {
+	router := NewRouter()
+	sup := New(Config{
+		Interpreter: "python3",
+		Module:      pyModule,
+		ExtraArgs:   pyExtra,
+		SocketPath:  socketPath,
+	})
+	SetDefault(sup)
+	return &Server{router: router, sup: sup, addr: addr}
+}
+
 // Server ties the HTTP router to the Python supervisor lifecycle.
 type Server struct {
 	router *Router

@@ -86,12 +86,21 @@ Go+Python, prod binario Python) se mantiene.
 
 ---
 
-## v0.6.0 — Hot-reload real (Fase 6)
+## v0.6.0 — Hot-reload real (Fase 6)  ← ESTADO: COMPLETADO
 
-Objetivo verificable: editar `.pgo` reinicia solo el proceso afectado; `.html`
-hot-swap sin reinicio; error de compilación mantiene el server vivo.
+Objetivo verificable: editar `.html` hace hot-swap del fragmento en memoria sin
+reiniciar el server; editar `.pgo` re-transpila y relanza solo Python; error de
+transpile mantiene el server vivo.
 
-- Reinicio granular según tipo de archivo (ya hay fsnotify, falta wiring).
+Entregado:
+- `runtime.go`: `Supervisor.Restart()` relanza solo Python (Go sigue vivo).
+- `router.go`: `SetView()` hot-swap de fragmento + `NewServerWithSocket()`.
+- `cli/dev.go`: `watchAndReload` usa `hotreload` (fsnotify) por extensión:
+  `.pgo`→retranspile+Restart, `.html`→SetView. Errores logueados, server vivo.
+- `cli/dev.go`: `transpile` usa binario prebuilt (evita `go run` interactivo).
+- Test `TestV060HotReload`: cambia fragmento en caliente, server no reinicia.
+
+## v0.7.0 — Multi-tenancy básico (Fase 7)
 
 ---
 

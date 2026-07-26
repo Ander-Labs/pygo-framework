@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/ander-labs/pygo/core/runtime"
+	"github.com/ander-labs/pygo/core/runtime/hotreload"
 )
 
 // runDev is the real v0.2.0 flow: transpile, then start the native net/http
@@ -67,9 +68,50 @@ func runDev(args []string) error {
 		return map[string]any{"user": user}, nil
 	}, true)
 
+	// Hot-reload: watch .pgo/.html and reload granularly.
+	go watchAndReload(projectDir, root, outDir, server, pgo)
+
 	fmt.Printf("dev server ready on http://127.0.0.1%s\n", normalizeAddr(*addr))
 	fmt.Println("dev: try  curl http://127.0.0.1:8080/hello/Anders")
+	fmt.Println("dev: hot-reload active (edit .pgo -> python restart, .html -> live swap)")
 	return server.Start()
+}
+
+// watchAndReload watches project files and reloads the minimal component:
+//   - .pgo  -> re-transpile + restart only the Python subprocess (Go stays up)
+//   - .html -> hot-swap the fragment in memory (no restart)
+// Transpile/restart errors are logged; the server stays alive.
+func watchAndReload(projectDir, frameworkRoot, outDir string, server *runtime.Server, pgo string) {
+	w, err := hotreload.New()
+	if err != nil {
+		fmt.Printf("dev: hot-reload disabled: %v\n", err)
+		return
+	}
+	if err := w.Add(projectDir, true); err != nil {
+		fmt.Printf("dev: hot-reload disabled: %v\n", err)
+		return
+	}
+	htmlPath := filepath.Join(projectDir, "hello.html")
+	w.On(".pgo", func(path string, op string) {
+		fmt.Println("dev: .pgo changed -> re-transpiling + restarting python")
+		if err := transpile(frameworkRoot, pgo, outDir); err != nil {
+			fmt.Printf("dev: transpile error (server kept alive): %v\n", err)
+			return
+		}
+		if err := server.Supervisor().Restart(); err != nil {
+			fmt.Printf("dev: python restart error (server kept alive): %v\n", err)
+			return
+		}
+		fmt.Println("dev: python reloaded")
+	})
+	w.On(".html", func(path string, op string) {
+		fmt.Println("dev: .html changed -> hot-swapping fragment")
+		if frag, err := os.ReadFile(htmlPath); err == nil {
+			server.Router().SetView("GET", "/hello/:name", string(frag))
+			fmt.Println("dev: fragment swapped")
+		}
+	})
+	w.Start()
 }
 
 // registerHelloRoute wires the /hello/:name route to Python in the PoC. The
@@ -91,8 +133,19 @@ func transpile(frameworkRoot, input, outDir string) error {
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command("go", "run", "./core/transpiler", absInput, "--out", absOut)
-	cmd.Dir = frameworkRoot
+	// Use a prebuilt transpiler binary (avoids `go run` per save and the
+	// interactive prompt it can trigger). Build it on first use.
+	bin := filepath.Join(os.TempDir(), "pygo-transpile")
+	if _, err := os.Stat(bin); err != nil {
+		cmd := exec.Command("go", "build", "-o", bin, "./core/transpiler")
+		cmd.Dir = frameworkRoot
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("building transpiler: %w", err)
+		}
+	}
+	cmd := exec.Command(bin, absInput, "--out", absOut)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()

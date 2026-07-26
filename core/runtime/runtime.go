@@ -151,6 +151,56 @@ func (s *Supervisor) CallPython(handler string, args map[string]interface{}) (in
 	return resp.Result, nil
 }
 
+// Restart terminates and relaunches only the Python subprocess, keeping the Go
+// server alive. Used by hot-reload when a .pgo changes.
+func (s *Supervisor) Restart() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.stopLocked(); err != nil {
+		return err
+	}
+	// Re-open the socket and relaunch Python.
+	ln, err := socket.Listen(s.cfg.SocketPath)
+	if err != nil {
+		return err
+	}
+	s.ln = ln
+	args := append([]string{s.cfg.Module}, s.cfg.ExtraArgs...)
+	cmd := exec.Command(s.cfg.Interpreter, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Env = append(os.Environ(), "PYGO_SOCKET="+ln.Path())
+	if err := cmd.Start(); err != nil {
+		_ = ln.Close()
+		return fmt.Errorf("runtime: restarting python: %w", err)
+	}
+	s.cmd = cmd
+
+	type acceptResult struct {
+		conn *socket.Conn
+		err  error
+	}
+	ch := make(chan acceptResult, 1)
+	go func() {
+		c, err := ln.Accept()
+		ch <- acceptResult{conn: c, err: err}
+	}()
+	select {
+	case res := <-ch:
+		if res.err != nil {
+			_ = s.stopLocked()
+			return fmt.Errorf("runtime: accepting python after restart: %w", res.err)
+		}
+		s.conn = res.conn
+	case <-time.After(s.cfg.AcceptTimeout):
+		_ = s.stopLocked()
+		return fmt.Errorf("runtime: timed out waiting for python after restart")
+	}
+	s.started = true
+	log.Printf("runtime: python restarted on %s (pid=%d)", ln.Path(), cmd.Process.Pid)
+	return nil
+}
+
 // Stop terminates the Python subprocess and closes the socket.
 func (s *Supervisor) Stop() error {
 	s.mu.Lock()
