@@ -14,6 +14,7 @@ Response frame (Python -> Go): {"result": <any>, "error": <CrossError|None>}
 
 from __future__ import annotations
 
+import inspect
 import os
 import socket
 import struct
@@ -28,6 +29,10 @@ import msgpack
 #     HANDLERS["get_customer"] = get_customer
 # We define it here so both this module and gen_py.py share the same dict object.
 HANDLERS: Dict[str, Callable[..., Any]] = {}
+
+# Per-request tenant, set from Go-side args["tenant"]. Because the Go
+# supervisor serializes CallPython with a mutex, a single global is safe.
+from core.runtime.db import set_tenant as _set_tenant  # noqa: E402
 
 DEFAULT_SOCKET_PATH = "/tmp/pygo.sock"
 
@@ -112,8 +117,11 @@ def dispatch(handler: str, args: Dict[str, Any]) -> Dict[str, Any]:
 
     The response is always {"result": ..., "error": ...} with exactly one of the
     two populated. Args keys prefixed with '_' are Go-side metadata (e.g. _auth,
-    _user) and are stripped before calling the Python handler.
+    _user) and are stripped before calling the Python handler. The "tenant"
+    key (injected by the Go tenancy middleware) selects the isolated DB.
+    String args from the Go side are coerced to the handler's declared types.
     """
+    _set_tenant((args or {}).get("tenant"))
     fn = HANDLERS.get(handler)
     if fn is None:
         return {
@@ -125,7 +133,27 @@ def dispatch(handler: str, args: Dict[str, Any]) -> Dict[str, Any]:
             },
         }
     try:
-        clean = {k: v for k, v in (args or {}).items() if not k.startswith("_")}
+        # Lightweight boundary validation: coerce URL-string args to the
+        # handler's declared parameter types.
+        sig = inspect.signature(fn)
+        clean = {
+            k: v
+            for k, v in (args or {}).items()
+            if not k.startswith("_") and k != "tenant"
+        }
+        for name, param in sig.parameters.items():
+            if name in clean and isinstance(clean[name], str):
+                ann = param.annotation
+                if ann is int:
+                    try:
+                        clean[name] = int(clean[name])
+                    except ValueError:
+                        pass
+                elif ann is float:
+                    try:
+                        clean[name] = float(clean[name])
+                    except ValueError:
+                        pass
         result = fn(**clean)
         return {"result": _to_wire(result), "error": None}
     except TypeError as exc:

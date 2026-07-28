@@ -36,44 +36,48 @@ func (r *Router) Mux() *http.ServeMux { return r.mux }
 // true, the request must carry a valid Bearer JWT (native middleware).
 //
 // net/http's ServeMux does not support :param wildcards, so routes containing a
-// ":name" segment are registered on the parent prefix (e.g. "/hello/:id" ->
-// "/hello/") and the param is extracted from the real request path.
-func (r *Router) Handle(method, path string, h func(args map[string]any) (any, error), auth bool) {
-	key := method + " " + path
-	registerPath := muxPath(path)
-	handler := h
-	if auth {
-		handler = AuthMiddleware(h)
-	}
-	r.mux.HandleFunc(registerPath, func(w http.ResponseWriter, req *http.Request) {
+// Handle registers a route. h receives the parsed args map (path params +
+// query) and returns (result, error) by delegating to Python. When auth is
+// true, the request must carry a valid Bearer JWT (subject injected as _user).
+// When tenant is true, the tenant is resolved and injected as "tenant".
+//
+// net/http's ServeMux does not support :param wildcards, so for routes that
+// contain a ":param" segment we register the longest prefix ending before the
+// first param and re-extract params from the real request path.
+func (r *Router) Handle(method, path string, h func(args map[string]any) (any, error), auth, tenant bool) {
+	muxPath := muxPath(path)
+	r.mux.HandleFunc(muxPath, func(w http.ResponseWriter, req *http.Request) {
 		if req.Method != method {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
 		args := map[string]any{}
 		extractPathParams(req, path, args)
-		extractAuth(req, args)
-		// Query params.
-		for k, vs := range req.URL.Query() {
-			if len(vs) > 0 {
-				args[k] = vs[0]
+		for k, v := range req.URL.Query() {
+			if len(v) > 0 {
+				args[k] = v[0]
 			}
 		}
-		result, err := handler(args)
-		if err != nil {
-			status := http.StatusInternalServerError
-			if strings.Contains(err.Error(), "token") || strings.Contains(err.Error(), "bearer") {
-				status = http.StatusUnauthorized
+		if tenant {
+			args["tenant"] = TenantFromRequest(req)
+		}
+		if auth {
+			claims, ok := extractAuth(req)
+			if !ok {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
 			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(status)
-			_, _ = fmt.Fprintf(w, `{"error":%q}`, err.Error())
+			args["_user"] = claims.Sub
+		}
+		result, err := h(args)
+		if err != nil {
+			writeError(w, err)
 			return
 		}
-		if view, ok := r.views[key]; ok {
+		if view, ok := r.views[method+" "+path]; ok {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			if err := view.Execute(w, result); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+			if execErr := view.Execute(w, result); execErr != nil {
+				http.Error(w, execErr.Error(), http.StatusInternalServerError)
 			}
 			return
 		}
@@ -205,4 +209,19 @@ func splitPath(p string) []string {
 		out = append(out, cur)
 	}
 	return out
+}
+
+// writeError renders a cross-language error as JSON, mapping auth/bad-token
+// messages to 401 and everything else to 500.
+func writeError(w http.ResponseWriter, err error) {
+	status := http.StatusInternalServerError
+	msg := err.Error()
+	low := strings.ToLower(msg)
+	if strings.Contains(low, "token") || strings.Contains(low, "bearer") ||
+		strings.Contains(low, "unauthor") {
+		status = http.StatusUnauthorized
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, _ = fmt.Fprintf(w, `{"error":%q}`, msg)
 }

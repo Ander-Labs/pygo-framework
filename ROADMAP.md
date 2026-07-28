@@ -100,40 +100,37 @@ Entregado:
 - `cli/dev.go`: `transpile` usa binario prebuilt (evita `go run` interactivo).
 - Test `TestV060HotReload`: cambia fragmento en caliente, server no reinicia.
 
-## v0.7.0 — Multi-tenancy básico (Fase 7)
+## v0.7.0 — Multi-tenancy básico (Fase 7)  ← ESTADO: COMPLETADO
 
----
+Objetivo verificable: 2 tenants aislados en una instancia; cada uno crea un
+Customer y no ve los datos del otro.
 
-## v0.7.0 — Multi-tenancy básico (Fase 7)
+- `tenancy.go`: `TenantFromRequest` resuelve tenant por header `X-Tenant-ID` o
+  subdominio.
+- `router.go`: `Handle(method, path, h, auth, tenant)`; inyecta `tenant` en args.
+- `db.py`: `connect(tenant=None)` abre `pygo_<tenant>.db`.
+- `pyclient`: `dispatch` setea `_current_tenant` global (mutex del supervisor
+  lo hace seguro) y filtra `tenant` del handler; coercion de tipos en frontera.
+- **Bug atrapado**: handlers que delegan a `CallPython` deben propagar
+  `tenant` en el args (sino caen a DB default) — cubierto por el test.
+- `gen_go.go` emite `, false, false)` (auth, tenant).
+- Test `TestV070Tenancy`: acme/globex aislados (globex NO ve customer de acme).
 
-Objetivo verificable: 2 tenants aislados en una instancia.
+## v0.8.0 — Plataforma de operación (Fase 8)  ← sugerida
 
-- `tenancy` module (single/multi DB).
+Objetivo verificable: el framework es operable en CI y tiene health/observabilidad mínima.
+- GitHub Actions CI (corre `go test ./...` + `go vet` + security scan en cada PR).
+- Health endpoint (`/healthz`) + graceful shutdown (SIGTERM).
+- Test unit del transpiler (AST visitor).
+- Flag `--target=go` para el descapote real (cierra la promesa monolito descapotable).
 
----
-
-## v0.8.0 — Background jobs (Fase 8)
-
+## v0.9.0 — Background jobs (Fase 9)
 Objetivo verificable: `worker` del `.pgo` encola y ejecuta fuera del request.
-
 - Queue in-memory → Redis opcional.
 - `worker` node en el transpiler.
 
----
-
-## v0.9.0 — Reportes + i18n (Fase 9)
-
+## v0.10.0 — Reportes + i18n (Fase 10)
 Objetivo verificable: reporte PDF/CSV desde un modelo; UI en 2 idiomas.
-
----
-
-## v0.10.0 … → v0.N.0 — Cobertura del DSL y del core
-
-Fases incrementales hasta cubrir la superficie del doc: `Enum`, `ForeignKey`,
-`Array/Map`, admin panel, auditoría, API REST automática, bus de eventos, etc.
-Cada una = un `v0.N.0` con su test.
-
----
 
 ## v1.0.0 — Primera versión estable
 

@@ -103,7 +103,18 @@ func AuthMiddleware(next func(args map[string]any) (any, error)) func(args map[s
 	}
 }
 
-// extractAuth pulls the Authorization header into args before dispatch.
-func extractAuth(req *http.Request, args map[string]any) {
-	args["_auth"] = req.Header.Get("Authorization")
+// extractAuth validates the Bearer token from the Authorization header and
+// returns the verified claims. ok is false (and no 401 yet) when missing/invalid;
+// the caller returns 401.
+func extractAuth(req *http.Request) (claims Claims, ok bool) {
+	auth := req.Header.Get("Authorization")
+	token := strings.TrimPrefix(auth, "Bearer ")
+	if token == "" || token == auth {
+		return Claims{}, false
+	}
+	c, err := VerifyHS256(token, jwtSecret())
+	if err != nil {
+		return Claims{}, false
+	}
+	return c, true
 }

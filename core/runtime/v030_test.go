@@ -41,11 +41,11 @@ func TestV030ORM(t *testing.T) {
 	server := NewServer(addr, appPath)
 	server.Router().Handle("POST", "/customers", func(args map[string]any) (any, error) {
 		return CallPython("create_customer", args)
-	}, false)
+	}, false, false)
 	server.Router().Handle("GET", "/customers/:id", func(args map[string]any) (any, error) {
-		id, _ := args["id"].(string)
+		id := toString(args["id"])
 		return CallPython("get_customer", map[string]any{"id": id})
-	}, false)
+	}, false, false)
 
 	go func() { _ = server.Start() }()
 	defer server.Stop()

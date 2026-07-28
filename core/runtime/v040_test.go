@@ -37,7 +37,7 @@ func TestV040Auth(t *testing.T) {
 	server.Router().Handle("GET", "/me", func(args map[string]any) (any, error) {
 		user, _ := args["_user"].(string)
 		return map[string]any{"user": user}, nil
-	}, true)
+	}, true, false)
 
 	go func() { _ = server.Start() }()
 	defer server.Stop()

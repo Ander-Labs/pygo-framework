@@ -66,7 +66,7 @@ func runDev(args []string) error {
 	server.Router().Handle("GET", "/me", func(args map[string]any) (any, error) {
 		user, _ := args["_user"].(string)
 		return map[string]any{"user": user}, nil
-	}, true)
+	}, true, false)
 
 	// Hot-reload: watch .pgo/.html and reload granularly.
 	go watchAndReload(projectDir, root, outDir, server, pgo)
@@ -120,7 +120,7 @@ func registerHelloRoute(r *runtime.Router) error {
 	r.Handle("GET", "/hello/:name", func(args map[string]any) (any, error) {
 		name, _ := args["name"].(string)
 		return runtime.CallPython("hello", map[string]any{"name": name})
-	}, false)
+	}, false, false)
 	return nil
 }
 

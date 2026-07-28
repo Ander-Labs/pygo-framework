@@ -38,7 +38,7 @@ func TestV060HotReload(t *testing.T) {
 	server.Router().Handle("GET", "/hello/:name", func(args map[string]any) (any, error) {
 		name, _ := args["name"].(string)
 		return map[string]any{"name": name}, nil
-	}, false)
+	}, false, false)
 
 	go func() { _ = server.Start() }()
 	defer server.Stop()
