@@ -199,6 +199,16 @@ func (g *GoGenerator) VisitFunction(n *ast.FunctionNode) (interface{}, error) {
 	return nil, nil
 }
 
+// VisitWorker registers a worker for the background queue. Go emits a route
+// POST /jobs/<worker> that enqueues and returns 202 + job_id, and a
+// GET /jobs/:id status endpoint. The actual execution delegates to Python.
+func (g *GoGenerator) VisitWorker(n *ast.WorkerNode) (interface{}, error) {
+	g.buf.WriteString(fmt.Sprintf("	r.Handle(\"POST\", %q, func(args map[string]interface{}) (interface{}, error) {\n", "/jobs/"+n.Name))
+	g.buf.WriteString(fmt.Sprintf("		return runtime.EnqueueJob(%q, args)\n", n.Name))
+	g.buf.WriteString("	}, false, false)\n")
+	return nil, nil
+}
+
 // exportName upper-cases the first letter to produce an exported Go identifier.
 func exportName(s string) string {
 	if s == "" {

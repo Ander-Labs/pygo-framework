@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ander-labs/pygo/core/runtime/jobs"
 	"github.com/ander-labs/pygo/core/runtime/socket"
 )
 
@@ -243,4 +244,30 @@ func CallPython(handler string, args map[string]interface{}) (interface{}, error
 		return nil, socket.NewGoError("RuntimeError", "no default supervisor registered (call runtime.SetDefault)")
 	}
 	return s.CallPython(handler, args)
+}
+
+// EnqueueJob adds a background job to the default queue. gen_go calls this for
+// worker routes. It must be callable from the generated code, which imports
+// "runtime" — so it lives in this package. The real implementation is in
+// core/runtime/jobs.Queue (imported here to avoid a cycle from jobs→runtime).
+func EnqueueJob(handler string, args map[string]interface{}) (interface{}, error) {
+	j := jobs.Enqueue(handler, args)
+	return map[string]interface{}{
+		"job_id": j.ID,
+		"status": string(j.Status),
+	}, nil
+}
+
+// GetJob returns a job's status by ID. gen_go uses this for the /jobs/:id route.
+func GetJob(id string) (interface{}, error) {
+	j := jobs.Get(id)
+	if j == nil {
+		return nil, socket.NewGoError("NotFound", "job not found")
+	}
+	return map[string]interface{}{
+		"job_id":  j.ID,
+		"status":  string(j.Status),
+		"result":  j.Result,
+		"error":   j.Error,
+	}, nil
 }

@@ -10,6 +10,8 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+
+	"github.com/ander-labs/pygo/core/runtime/jobs"
 )
 
 // Router adapts generated routes to the standard library net/http mux.
@@ -139,6 +141,10 @@ func NewServerWithSocket(addr, socketPath, pyModule string, pyExtra ...string) *
 	SetDefault(sup)
 	s := &Server{router: router, sup: sup, addr: addr}
 	s.registerHealth()
+	// Wire the job queue executor to runtime.CallPython (breaks import cycle).
+	jobs.Init(func(handler string, args map[string]any) (any, error) {
+		return CallPython(handler, args)
+	})
 	return s
 }
 
@@ -179,6 +185,10 @@ func NewServer(addr, pyModule string, pyExtra ...string) *Server {
 	SetDefault(sup)
 	s := &Server{router: router, sup: sup, addr: addr}
 	s.registerHealth()
+	// Wire the job queue executor to runtime.CallPython (breaks import cycle).
+	jobs.Init(func(handler string, args map[string]any) (any, error) {
+		return CallPython(handler, args)
+	})
 	return s
 }
 

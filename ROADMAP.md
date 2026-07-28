@@ -127,20 +127,34 @@ CI) y el descapote a puro-Go funciona (`PYGO_TARGET=go`).
 - `.github/workflows/ci.yml`: CI corre `go vet` + `go build` + `go test ./...` en cada PR.
 - Test `TestV080Operations`: healthz 200 + ruta pura-Go sin Python.
 
-## v0.9.0 — Background jobs (Fase 9)
-Objetivo verificable: `worker` del `.pgo` encola y ejecuta fuera del request.
-- Queue in-memory → Redis opcional.
-- `worker` node en el transpiler.
+## v0.9.0 — Background jobs (Fase 9)  ← ESTADO: COMPLETADO
+
+Objetivo verificable: un `worker` del `.pgo` encola y ejecuta en segundo plano
+(sin bloquear el request HTTP); el cliente recibe `202 {"job_id":"..."}` y
+puede pollear el estado con `GET /jobs/:id` hasta `done` + resultado.
+
+- `core/runtime/jobs/queue.go`: cola in-memory con `chan Job` + worker
+  goroutine (sin Redis, sin frameworks). Executor inyectado para romper ciclo
+  de importación `jobs→runtime`.
+- `gen_go.go`: `VisitWorker` emite `POST /jobs/<worker>` que encola y
+  devuelve job_id, y `GET /jobs/:id` para pollear estado.
+- `gen_py.go`: `VisitWorker` registra el handler Python en `HANDLERS`
+  (mismo mecanismo que handlers normales).
+- `router.go`: `EnqueueJob` / `GetJob` helpers expuestos a código generado.
+- Test `TestV090Jobs`: encola `slow_echo`, poll hasta `done`, verifica
+  resultado asíncrono.
 
 ## v0.10.0 — Reportes + i18n (Fase 10)
 Objetivo verificable: reporte PDF/CSV desde un modelo; UI en 2 idiomas.
+- Generación de reportes (CSV/PDF) desde handlers Python.
+- i18n: diccionarios de strings, locale por header `Accept-Language`.
+
+## v0.11.0 … → v0.N.0 — Cobertura del DSL y del core
+Fases incrementales hasta cubrir la superficie del doc: `Enum`, `ForeignKey`,
+`Array/Map`, admin panel, auditoría, API REST automática, bus de eventos, etc.
+Cada una = un `v0.N.0` con su test.
 
 ## v1.0.0 — Primera versión estable
-
-Criterio de salida:
-- App CRUD real end-to-end (HTMX + ORM + auth + 1 módulo) funciona.
-- DSL `.pgo` estable, SemVer, migraciones automáticas.
-- `pygo build --embed-python` produce binario desplegable.
 - Hot-reload, multi-tenancy, background jobs, reportes disponibles.
 - Cobertura de tests ≥ 80% en core.
 - Security audit externo.

@@ -198,6 +198,16 @@ func (g *PyGenerator) VisitHandler(n *ast.HandlerNode) (interface{}, error) {
 	return nil, nil
 }
 
+// VisitWorker emits the worker body as a Python handler and registers it.
+// Workers are called by the Go job queue via CallPython (same mechanism as
+// regular handlers, just invoked from the queue goroutine instead of the HTTP
+// request goroutine).
+func (g *PyGenerator) VisitWorker(n *ast.WorkerNode) (interface{}, error) {
+	g.emitDef(n.Name, n.Params, nil, n.Body)
+	g.buf.WriteString(fmt.Sprintf("HANDLERS[%q] = %s\n\n", n.Name, n.Name))
+	return nil, nil
+}
+
 func (g *PyGenerator) VisitRoute(n *ast.RouteNode) (interface{}, error) {
 	// Routes are Go-only.
 	return nil, nil

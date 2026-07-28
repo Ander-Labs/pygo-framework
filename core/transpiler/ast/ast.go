@@ -22,6 +22,7 @@ type Visitor interface {
 	VisitHandler(n *HandlerNode) (interface{}, error)
 	VisitFunction(n *FunctionNode) (interface{}, error)
 	VisitField(n *FieldNode) (interface{}, error)
+	VisitWorker(n *WorkerNode) (interface{}, error)
 }
 
 // TypeRef describes a resolved DSL type reference, e.g. Optional[String],
@@ -124,12 +125,27 @@ func (n *FunctionNode) Accept(v Visitor) (interface{}, error) {
 	return v.VisitFunction(n)
 }
 
+// WorkerNode is a `worker` declaration: an async job handler that runs in the
+// background queue, not blocking the HTTP request.
+type WorkerNode struct {
+	Name   string
+	Params []*FieldNode
+	Body   []string // raw Python body (executed via CallPython)
+	Line   int
+}
+
+func (n *WorkerNode) node() {}
+func (n *WorkerNode) Accept(v Visitor) (interface{}, error) {
+	return v.VisitWorker(n)
+}
+
 // Program is the root node holding all top-level declarations in order.
 type Program struct {
 	Models    []*ModelNode
 	Routes    []*RouteNode
 	Handlers  []*HandlerNode
 	Functions []*FunctionNode
+	Workers   []*WorkerNode
 	// Decls preserves original source order of top-level nodes.
 	Decls []Node
 }

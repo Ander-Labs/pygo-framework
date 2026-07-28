@@ -98,6 +98,13 @@ func (p *Parser) Parse() (*ast.Program, error) {
 			}
 			prog.Functions = append(prog.Functions, f)
 			prog.Decls = append(prog.Decls, f)
+		case lexer.TokenWorker:
+			w, err := p.parseWorker()
+			if err != nil {
+				return nil, err
+			}
+			prog.Workers = append(prog.Workers, w)
+			prog.Decls = append(prog.Decls, w)
 		default:
 			return nil, fmt.Errorf("line %d: unexpected token %s %q at top level",
 				t.Line, t.Type, t.Value)
@@ -302,6 +309,24 @@ func (p *Parser) parseFunction() (*ast.FunctionNode, error) {
 		ReturnType: ret,
 		Body:       body,
 		Line:       kw.Line,
+	}, nil
+}
+
+// parseWorker parses a worker definition + verbatim body. A worker is like a
+// handler but runs async in the background job queue instead of blocking the
+// HTTP request. Its body is Python, executed via CallPython.
+func (p *Parser) parseWorker() (*ast.WorkerNode, error) {
+	kw := p.advance() // worker
+	name, params, _, err := p.parseSignature()
+	if err != nil {
+		return nil, err
+	}
+	body := p.captureBody()
+	return &ast.WorkerNode{
+		Name:   name,
+		Params: params,
+		Body:   body,
+		Line:   kw.Line,
 	}, nil
 }
 
