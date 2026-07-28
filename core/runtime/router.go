@@ -4,8 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 )
 
 // Router adapts generated routes to the standard library net/http mux.
@@ -133,7 +137,28 @@ func NewServerWithSocket(addr, socketPath, pyModule string, pyExtra ...string) *
 		SocketPath:  socketPath,
 	})
 	SetDefault(sup)
-	return &Server{router: router, sup: sup, addr: addr}
+	s := &Server{router: router, sup: sup, addr: addr}
+	s.registerHealth()
+	return s
+}
+
+// registerHealth adds /healthz (liveness) and /readyz (readiness) endpoints.
+func (s *Server) registerHealth() {
+	s.router.mux.HandleFunc("/healthz", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+	s.router.mux.HandleFunc("/readyz", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if s.sup == nil || !s.sup.Ready() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"status":"not ready"}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ready"}`))
+	})
 }
 
 // Server ties the HTTP router to the Python supervisor lifecycle.
@@ -152,17 +177,28 @@ func NewServer(addr, pyModule string, pyExtra ...string) *Server {
 		ExtraArgs:   pyExtra,
 	})
 	SetDefault(sup)
-	return &Server{router: router, sup: sup, addr: addr}
+	s := &Server{router: router, sup: sup, addr: addr}
+	s.registerHealth()
+	return s
 }
 
 // Router returns the router so generated code can RegisterRoutes + RegisterView.
 func (s *Server) Router() *Router { return s.router }
 
-// Start launches Python and begins serving (blocks).
+// Start launches Python and begins serving. It blocks until the process is
+// signalled (SIGTERM/SIGINT) or the server fails; on signal it performs a
+// graceful shutdown (stops Python, closes the socket) before returning.
 func (s *Server) Start() error {
 	if err := s.sup.Start(); err != nil {
 		return err
 	}
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		<-sigCh
+		log.Printf("runtime: shutdown signal received, stopping")
+		_ = s.Stop()
+	}()
 	return http.ListenAndServe(s.addr, s.router.Mux())
 }
 

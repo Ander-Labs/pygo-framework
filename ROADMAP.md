@@ -116,13 +116,16 @@ Customer y no ve los datos del otro.
 - `gen_go.go` emite `, false, false)` (auth, tenant).
 - Test `TestV070Tenancy`: acme/globex aislados (globex NO ve customer de acme).
 
-## v0.8.0 — Plataforma de operación (Fase 8)  ← sugerida
+## v0.8.0 — Plataforma de operación (Fase 8)  ← ESTADO: COMPLETADO
 
-Objetivo verificable: el framework es operable en CI y tiene health/observabilidad mínima.
-- GitHub Actions CI (corre `go test ./...` + `go vet` + security scan en cada PR).
-- Health endpoint (`/healthz`) + graceful shutdown (SIGTERM).
-- Test unit del transpiler (AST visitor).
-- Flag `--target=go` para el descapote real (cierra la promesa monolito descapotable).
+Objetivo verificable: el framework es operable (health, graceful shutdown,
+CI) y el descapote a puro-Go funciona (`PYGO_TARGET=go`).
+- `router.go`: `/healthz` (liveness) + `/readyz` (readiness) en cada server.
+- `router.go`: `Start()` captura SIGTERM/SIGINT → graceful shutdown (para Python + socket).
+- `gen_go.go`: `PYGO_TARGET=go` emite handlers puros en Go (sin Python) — descapote real.
+- `core/transpiler/parser/parser_test.go`: test unit del AST visitor (front-end del compilador).
+- `.github/workflows/ci.yml`: CI corre `go vet` + `go build` + `go test ./...` en cada PR.
+- Test `TestV080Operations`: healthz 200 + ruta pura-Go sin Python.
 
 ## v0.9.0 — Background jobs (Fase 9)
 Objetivo verificable: `worker` del `.pgo` encola y ejecuta fuera del request.

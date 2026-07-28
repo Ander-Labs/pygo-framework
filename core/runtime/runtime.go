@@ -201,6 +201,13 @@ func (s *Supervisor) Restart() error {
 	return nil
 }
 
+// Ready reports whether Python is connected and serving.
+func (s *Supervisor) Ready() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.started && s.conn != nil
+}
+
 // Stop terminates the Python subprocess and closes the socket.
 func (s *Supervisor) Stop() error {
 	s.mu.Lock()

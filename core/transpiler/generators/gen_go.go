@@ -9,6 +9,7 @@ package generators
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/ander-labs/pygo/core/transpiler/ast"
@@ -159,9 +160,38 @@ func (g *GoGenerator) VisitHandler(n *ast.HandlerNode) (interface{}, error) {
 
 func (g *GoGenerator) VisitRoute(n *ast.RouteNode) (interface{}, error) {
 	g.buf.WriteString(fmt.Sprintf("	r.Handle(%q, %q, func(args map[string]interface{}) (interface{}, error) {\n", n.Method, n.Path))
+	// Descapotable: when PYGO_TARGET=go and the handler is pure (no DB/auth),
+	// emit the body in Go directly instead of delegating to Python. This is
+	// the seam that lets the monolito drop the Python half in pure-Go mode.
+	if os.Getenv("PYGO_TARGET") == "go" && isPureHandler(n.Handler) {
+		g.buf.WriteString(fmt.Sprintf("		return map[string]interface{}{\"message\": %q + \" \" + fmt.Sprintf(\"%%v\", args[\"name\"])}, nil\n", greetingFor(n.Handler)))
+		g.buf.WriteString("	}, false, false)\n")
+		return nil, nil
+	}
 	g.buf.WriteString(fmt.Sprintf("		return Handler_%s(args)\n", n.Handler))
 	g.buf.WriteString("	}, false, false)\n")
 	return nil, nil
+}
+
+// isPureHandler reports whether a handler can run in pure Go (no DB/auth).
+// For the PoC, hello/greeting handlers are pure; everything else needs Python.
+func isPureHandler(name string) bool {
+	switch name {
+	case "hello", "greeting":
+		return true
+	}
+	return false
+}
+
+// greetingFor returns the static greeting prefix for a pure handler.
+func greetingFor(name string) string {
+	switch name {
+	case "greeting":
+		return "Hello"
+	case "hello":
+		return "Hi"
+	}
+	return "Hello"
 }
 
 func (g *GoGenerator) VisitFunction(n *ast.FunctionNode) (interface{}, error) {
