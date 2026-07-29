@@ -25,6 +25,8 @@ type Visitor interface {
 	VisitWorker(n *WorkerNode) (interface{}, error)
 	VisitReport(n *ReportNode) (interface{}, error)
 	VisitI18nConfig(n *I18nConfigNode) (interface{}, error)
+	VisitEnum(n *EnumNode) (interface{}, error)
+	VisitForeignKey(n *ForeignKeyNode) (interface{}, error)
 }
 
 // TypeRef describes a resolved DSL type reference, e.g. Optional[String],
@@ -168,6 +170,32 @@ func (n *I18nConfigNode) Accept(v Visitor) (interface{}, error) {
 	return v.VisitI18nConfig(n)
 }
 
+// EnumNode is an `enum` declaration: a named set of string values.
+// e.g. enum Status: active inactive pending
+type EnumNode struct {
+	Name   string
+	Values []string
+	Line   int
+}
+
+func (n *EnumNode) node() {}
+func (n *EnumNode) Accept(v Visitor) (interface{}, error) {
+	return v.VisitEnum(n)
+}
+
+// ForeignKeyNode is a `foreignKey` declaration: a named reference to another model.
+// e.g. foreignKey User
+type ForeignKeyNode struct {
+	Name       string // field name
+	Target     string // model name it references
+	Line       int
+}
+
+func (n *ForeignKeyNode) node() {}
+func (n *ForeignKeyNode) Accept(v Visitor) (interface{}, error) {
+	return v.VisitForeignKey(n)
+}
+
 // Program is the root node holding all top-level declarations in order.
 type Program struct {
 	Models    []*ModelNode
@@ -177,6 +205,8 @@ type Program struct {
 	Workers   []*WorkerNode
 	Reports   []*ReportNode
 	I18n      *I18nConfigNode
+	Enums     []*EnumNode
+	ForeignKeys []*ForeignKeyNode
 	// Decls preserves original source order of top-level nodes.
 	Decls []Node
 }

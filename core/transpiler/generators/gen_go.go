@@ -102,6 +102,13 @@ func (g *GoGenerator) VisitProgram(n *ast.Program) (interface{}, error) {
 		}
 	}
 
+	// Enums -> Go type aliases before handlers/routes.
+	for _, e := range n.Enums {
+		if _, err := e.Accept(g); err != nil {
+			return nil, err
+		}
+	}
+
 	// Handlers -> stubs.
 	for _, h := range n.Handlers {
 		if _, err := h.Accept(g); err != nil {
@@ -236,5 +243,24 @@ func (g *GoGenerator) VisitReport(n *ast.ReportNode) (interface{}, error) {
 
 // VisitI18nConfig emits nothing in Go (i18n is handled in Python runtime).
 func (g *GoGenerator) VisitI18nConfig(n *ast.I18nConfigNode) (interface{}, error) {
+	return nil, nil
+}
+
+// VisitEnum emits Go type aliases for enum values (string type constants).
+func (g *GoGenerator) VisitEnum(n *ast.EnumNode) (interface{}, error) {
+	g.buf.WriteString(fmt.Sprintf("type %s string\n", n.Name))
+	g.buf.WriteString("const (\n")
+	for _, v := range n.Values {
+		name := exportName(v)
+		g.buf.WriteString(fmt.Sprintf("	%s%s %s = %q\n", n.Name, name, n.Name, v))
+	}
+	g.buf.WriteString(")\n\n")
+	return nil, nil
+}
+
+// VisitForeignKey emits Go type alias for foreign key references.
+func (g *GoGenerator) VisitForeignKey(n *ast.ForeignKeyNode) (interface{}, error) {
+	// ForeignKeys in DSL are mostly used in Python for relationship helpers;
+	// Go output can optionally generate a struct helper, but for now emit no-op.
 	return nil, nil
 }

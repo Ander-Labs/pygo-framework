@@ -119,6 +119,20 @@ func (p *Parser) Parse() (*ast.Program, error) {
 			}
 			prog.I18n = i18n
 			prog.Decls = append(prog.Decls, i18n)
+		case lexer.TokenEnum:
+			e, err := p.parseEnum()
+			if err != nil {
+				return nil, err
+			}
+			prog.Enums = append(prog.Enums, e)
+			prog.Decls = append(prog.Decls, e)
+		case lexer.TokenForeignKey:
+			fk, err := p.parseForeignKey()
+			if err != nil {
+				return nil, err
+			}
+			prog.ForeignKeys = append(prog.ForeignKeys, fk)
+			prog.Decls = append(prog.Decls, fk)
 		default:
 			return nil, fmt.Errorf("line %d: unexpected token %s %q at top level",
 				t.Line, t.Type, t.Value)
@@ -474,6 +488,57 @@ func (p *Parser) parseI18nConfig() (*ast.I18nConfigNode, error) {
 		Locales:       locales,
 		Line:          kw.Line,
 	}, nil
+}
+
+// parseEnum parses: enum Name: val1 val2 val3
+func (p *Parser) parseEnum() (*ast.EnumNode, error) {
+	kw := p.advance() // enum
+	nameTok := p.cur()
+	if nameTok.Type != lexer.TokenIdent {
+		return nil, fmt.Errorf("line %d: expected enum name, got %q", nameTok.Line, nameTok.Value)
+	}
+	p.advance()
+	if err := p.expect(lexer.TokenColon); err != nil {
+		return nil, err
+	}
+	var values []string
+	for {
+		t := p.cur()
+		if t.Type == lexer.TokenEOF || t.Type == lexer.TokenDedent {
+			break
+		}
+		if t.Type == lexer.TokenIdent {
+			values = append(values, t.Value)
+			p.advance()
+			continue
+		}
+		if t.Type == lexer.TokenComma || t.Type == lexer.TokenArrow || t.Type == lexer.TokenNewline || t.Type == lexer.TokenIndent {
+			p.advance()
+			continue
+		}
+		break
+	}
+	return &ast.EnumNode{Name: nameTok.Value, Values: values, Line: kw.Line}, nil
+}
+
+// parseForeignKey parses: foreignKey FieldName -> Model
+// (DSL sugared form; Model is referenced by name)
+func (p *Parser) parseForeignKey() (*ast.ForeignKeyNode, error) {
+	kw := p.advance() // foreignKey
+	fieldTok := p.cur()
+	if fieldTok.Type != lexer.TokenIdent {
+		return nil, fmt.Errorf("line %d: expected field name, got %q", fieldTok.Line, fieldTok.Value)
+	}
+	p.advance()
+	if p.cur().Type == lexer.TokenArrow {
+		p.advance()
+	}
+	targetTok := p.cur()
+	if targetTok.Type != lexer.TokenIdent {
+		return nil, fmt.Errorf("line %d: expected model name, got %q", targetTok.Line, targetTok.Value)
+	}
+	p.advance()
+	return &ast.ForeignKeyNode{Name: fieldTok.Value, Target: targetTok.Value, Line: kw.Line}, nil
 }
 
 // parseSignature parses `name(params) [-> RetType]:` and stops after the colon.

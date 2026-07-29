@@ -33,6 +33,8 @@ const (
 	TokenWorker
 	TokenReport
 	TokenI18n
+	TokenEnum
+	TokenForeignKey
 
 	// Type keywords
 	TokenType_ // a recognized DSL type name (String, Int, ...)
@@ -86,6 +88,10 @@ func (t TokenType) String() string {
 		return "REPORT"
 	case TokenI18n:
 		return "I18N"
+	case TokenEnum:
+		return "ENUM"
+	case TokenForeignKey:
+		return "FOREIGN_KEY"
 	case TokenType_:
 		return "TYPE"
 	case TokenColon:
@@ -135,13 +141,15 @@ type Token struct {
 
 // keywords maps reserved words to their token types.
 var keywords = map[string]TokenType{
-	"model":    TokenModel,
-	"route":    TokenRoute,
-	"handler":  TokenHandler,
-	"function": TokenFunction,
-	"worker":   TokenWorker,
-	"report":   TokenReport,
-	"i18n":     TokenI18n,
+	"model":      TokenModel,
+	"route":      TokenRoute,
+	"handler":    TokenHandler,
+	"function":   TokenFunction,
+	"worker":     TokenWorker,
+	"report":     TokenReport,
+	"i18n":       TokenI18n,
+	"enum":       TokenEnum,
+	"foreignKey": TokenForeignKey,
 }
 
 // dslTypes is the set of recognized DSL type names (Fase 0).

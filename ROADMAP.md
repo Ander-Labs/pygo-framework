@@ -164,7 +164,34 @@ Entregado:
   `report`/`i18n` en lexer, `parseReport`/`parseI18nConfig` en parser.
 - Test `TestV100ReportsI18n`: verifica i18n es/en + CSV report con datos.
 
-## v0.11.0 … → v0.N.0 — Cobertura del DSL y del core
+## v0.11.0 — Enum + ForeignKey + Array/Map (Cobertura del DSL)
+
+**Estado: COMPLETADO**
+
+Objetivo verificable: el DSL `.pgo` soporta `Enum`, `ForeignKey`, `Array[T]`, `Map[K]V` como tipos de campo de modelo; el transpiler genera código Python+Go correcto.
+
+### Implementación
+- **Enum**: `enum Status: active inactive pending` → Go `type Status string` + Python `class Status(str, enum.Enum)`
+- **ForeignKey**: `foreignKey user_id -> User` → AST `ForeignKeyNode` con `Name`/`Target`, Go/Fn placeholder
+- **Array[T]**: `tags: Array[String]` → Go `[]string` + Python `list[str]`
+- **Map[K]V**: `metadata: Map[String]String` → Go `map[string]string` + Python `dict[str, str]`
+
+### Archivos modificados
+- `core/transpiler/ast/ast.go`: nodos `EnumNode`, `ForeignKeyNode`, visitas en `Visitor`
+- `core/transpiler/lexer/lexer.go`: tokens `TokenEnum`, `TokenForeignKey`
+- `core/transpiler/parser/parser.go`: `parseEnum()`, `parseForeignKey()`, handlers en switch
+- `core/transpiler/generators/gen_go.go`: `VisitEnum` (type alias), `VisitForeignKey` (no-op), loop de enums en `VisitProgram`
+- `core/transpiler/generators/gen_py.go`: `VisitEnum` (class), `VisitForeignKey` (no-op), import `enum`, loop de enums en `VisitProgram`
+- `core/transpiler/v110_test.go`: test integrado `TestV110DSLTypes`
+- `examples/hello-world/hello.pgo`: ejemplo con todos los tipos
+
+### Prueba (real)
+```
+v0.11.0 DSL types OK
+```
+Suite completa: **runtime 10/10 + transpiler 1/1 PASS**.
+
+## v0.12.0 … → v0.N.0 — Cobertura del DSL y del core
 Fases incrementales hasta cubrir la superficie del doc: `Enum`, `ForeignKey`,
 `Array/Map`, admin panel, auditoría, API REST automática, bus de eventos, etc.
 Cada una = un `v0.N.0` con su test.

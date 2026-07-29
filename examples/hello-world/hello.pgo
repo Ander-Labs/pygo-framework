@@ -1,23 +1,19 @@
-# PyGo example — cubre v0.1 (hello), v0.2 (HTMX), v0.3 (ORM Customer)
+model Product:
+  name: String
+  price: Float
+  tags: Array[String]
+  metadata: Map[String]String
 
-model Greeting:
-    id: UUID?
-    name: String
+enum Status:
+  active
+  inactive
+  pending
 
-model Customer:
-    id: UUID?
-    name: String
-    email: Email
+foreignKey user_id -> User
 
-route GET /hello/:name -> hello
-route POST /customers -> create_customer
-route GET /customers/:id -> get_customer
-
-handler hello(name: String) -> Greeting:
-    return Greeting(name=name)
-
-handler create_customer(name: String, email: Email) -> Customer:
-    return Customer.create(name=name, email=email)
-
-handler get_customer(id: Int) -> Customer:
-    return Customer.find(id)
+model Order:
+  user: String
+  status: Status
+  ref: ForeignKey[User]
+  items: Array[String]
+  extras: Map[String]String
