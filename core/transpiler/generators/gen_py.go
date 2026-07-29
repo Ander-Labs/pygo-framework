@@ -276,3 +276,44 @@ func toSnake(s string) string {
 	}
 	return b.String()
 }
+
+// VisitReport emits the Python handler that generates a CSV report.
+// It queries the model and streams CSV rows.
+func (g *PyGenerator) VisitReport(n *ast.ReportNode) (interface{}, error) {
+	// Build field list
+	fields := n.Fields
+	if len(fields) == 0 {
+		// Will be filled at runtime from model columns
+		fields = []string{"*"}
+	}
+	fieldList := "[\"" + strings.Join(fields, "\", \"") + "\"]"
+
+	g.buf.WriteString(fmt.Sprintf("def %s(_locale: str = \"en\", **args):\n", n.Name))
+	g.buf.WriteString("    \"\"\"Generated CSV report handler.\"\"\"\n")
+	g.buf.WriteString("    from core.runtime.db import connect\n")
+	g.buf.WriteString("    import csv\n")
+	g.buf.WriteString("    from io import StringIO\n\n")
+	g.buf.WriteString(fmt.Sprintf("    # Query model %s\n", n.Model))
+	g.buf.WriteString(fmt.Sprintf("    conn = connect()\n"))
+	g.buf.WriteString(fmt.Sprintf("    cur = conn.execute(\"SELECT * FROM %s\")\n", toSnake(n.Model)))
+	g.buf.WriteString("    rows = cur.fetchall()\n")
+	g.buf.WriteString("    conn.close()\n\n")
+	g.buf.WriteString("    output = StringIO()\n")
+	g.buf.WriteString(fmt.Sprintf("    writer = csv.writer(output)\n"))
+	g.buf.WriteString(fmt.Sprintf("    writer.writerow(%s)\n", fieldList))
+	g.buf.WriteString("    for row in rows:\n")
+	g.buf.WriteString("        writer.writerow(row)\n")
+	g.buf.WriteString("    return {\"csv\": output.getvalue()}\n\n")
+	g.buf.WriteString(fmt.Sprintf("HANDLERS[%q] = %s\n\n", n.Name, n.Name))
+	return nil, nil
+}
+
+// VisitI18nConfig emits the locale dictionaries and translation helper.
+func (g *PyGenerator) VisitI18nConfig(n *ast.I18nConfigNode) (interface{}, error) {
+	// This will be loaded at runtime from JSON files in core/runtime/locales/
+	// We just emit a placeholder that the runtime will fill.
+	g.buf.WriteString("# i18n configuration loaded at runtime from locales/*.json\n")
+	g.buf.WriteString(fmt.Sprintf("I18N_DEFAULT_LOCALE = %q\n", n.DefaultLocale))
+	g.buf.WriteString(fmt.Sprintf("I18N_LOCALES = %s\n\n", n.Locales))
+	return nil, nil
+}

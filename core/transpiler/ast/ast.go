@@ -23,6 +23,8 @@ type Visitor interface {
 	VisitFunction(n *FunctionNode) (interface{}, error)
 	VisitField(n *FieldNode) (interface{}, error)
 	VisitWorker(n *WorkerNode) (interface{}, error)
+	VisitReport(n *ReportNode) (interface{}, error)
+	VisitI18nConfig(n *I18nConfigNode) (interface{}, error)
 }
 
 // TypeRef describes a resolved DSL type reference, e.g. Optional[String],
@@ -139,6 +141,33 @@ func (n *WorkerNode) Accept(v Visitor) (interface{}, error) {
 	return v.VisitWorker(n)
 }
 
+// ReportNode is a `report` declaration: generates a CSV/PDF report from a model.
+type ReportNode struct {
+	Name       string
+	Model      string   // model to report on
+	Fields     []string // fields to include (empty = all)
+	Format     string   // "csv" or "pdf" (v0.10: only csv)
+	Path       string   // endpoint path, e.g. "/reports/customers.csv"
+	Line       int
+}
+
+func (n *ReportNode) node() {}
+func (n *ReportNode) Accept(v Visitor) (interface{}, error) {
+	return v.VisitReport(n)
+}
+
+// I18nConfigNode is an `i18n` configuration block.
+type I18nConfigNode struct {
+	DefaultLocale string   // e.g. "en"
+	Locales       []string // e.g. ["en", "es"]
+	Line          int
+}
+
+func (n *I18nConfigNode) node() {}
+func (n *I18nConfigNode) Accept(v Visitor) (interface{}, error) {
+	return v.VisitI18nConfig(n)
+}
+
 // Program is the root node holding all top-level declarations in order.
 type Program struct {
 	Models    []*ModelNode
@@ -146,6 +175,8 @@ type Program struct {
 	Handlers  []*HandlerNode
 	Functions []*FunctionNode
 	Workers   []*WorkerNode
+	Reports   []*ReportNode
+	I18n      *I18nConfigNode
 	// Decls preserves original source order of top-level nodes.
 	Decls []Node
 }

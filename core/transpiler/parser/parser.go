@@ -105,6 +105,20 @@ func (p *Parser) Parse() (*ast.Program, error) {
 			}
 			prog.Workers = append(prog.Workers, w)
 			prog.Decls = append(prog.Decls, w)
+		case lexer.TokenReport:
+			r, err := p.parseReport()
+			if err != nil {
+				return nil, err
+			}
+			prog.Reports = append(prog.Reports, r)
+			prog.Decls = append(prog.Decls, r)
+		case lexer.TokenI18n:
+			i18n, err := p.parseI18nConfig()
+			if err != nil {
+				return nil, err
+			}
+			prog.I18n = i18n
+			prog.Decls = append(prog.Decls, i18n)
 		default:
 			return nil, fmt.Errorf("line %d: unexpected token %s %q at top level",
 				t.Line, t.Type, t.Value)
@@ -327,6 +341,138 @@ func (p *Parser) parseWorker() (*ast.WorkerNode, error) {
 		Params: params,
 		Body:   body,
 		Line:   kw.Line,
+	}, nil
+}
+
+// parseReport parses a report declaration:
+// report Name from Model [fields: a, b, c] format: csv|pdf at /path
+// For v0.10 PoC: only csv format, fields optional.
+func (p *Parser) parseReport() (*ast.ReportNode, error) {
+	kw := p.advance() // report
+	nameTok := p.cur()
+	if nameTok.Type != lexer.TokenIdent {
+		return nil, fmt.Errorf("line %d: expected report name, got %q", nameTok.Line, nameTok.Value)
+	}
+	name := nameTok.Value
+	p.advance()
+
+	// Expect "from" keyword (as ident)
+	if p.cur().Type != lexer.TokenIdent || p.cur().Value != "from" {
+		return nil, fmt.Errorf("line %d: expected 'from', got %q", p.cur().Line, p.cur().Value)
+	}
+	p.advance()
+
+	modelTok := p.cur()
+	if modelTok.Type != lexer.TokenIdent {
+		return nil, fmt.Errorf("line %d: expected model name after 'from', got %q", modelTok.Line, modelTok.Value)
+	}
+	model := modelTok.Value
+	p.advance()
+
+	var fields []string
+	if p.cur().Type == lexer.TokenIdent && p.cur().Value == "fields:" {
+		p.advance()
+		// Parse comma-separated field names
+		for {
+			fTok := p.cur()
+			if fTok.Type != lexer.TokenIdent {
+				break
+			}
+			fields = append(fields, fTok.Value)
+			p.advance()
+			if p.cur().Type == lexer.TokenComma {
+				p.advance()
+				continue
+			}
+			break
+		}
+	}
+
+	format := "csv"
+	if p.cur().Type == lexer.TokenIdent && p.cur().Value == "format:" {
+		p.advance()
+		fTok := p.cur()
+		if fTok.Type != lexer.TokenIdent {
+			return nil, fmt.Errorf("line %d: expected format name, got %q", fTok.Line, fTok.Value)
+		}
+		format = fTok.Value
+		p.advance()
+	}
+
+	// Expect "at" keyword for path
+	if p.cur().Type != lexer.TokenIdent || p.cur().Value != "at" {
+		return nil, fmt.Errorf("line %d: expected 'at', got %q", p.cur().Line, p.cur().Value)
+	}
+	p.advance()
+
+	pathTok := p.cur()
+	if pathTok.Type != lexer.TokenIdent && pathTok.Type != lexer.TokenString {
+		return nil, fmt.Errorf("line %d: expected path after 'at', got %q", pathTok.Line, pathTok.Value)
+	}
+	path := pathTok.Value
+	p.advance()
+
+	if err := p.expect(lexer.TokenColon); err != nil {
+		return nil, err
+	}
+
+	return &ast.ReportNode{
+		Name:   name,
+		Model:  model,
+		Fields: fields,
+		Format: format,
+		Path:   path,
+		Line:   kw.Line,
+	}, nil
+}
+
+// parseI18nConfig parses:
+// i18n default: en locales: [en, es]
+func (p *Parser) parseI18nConfig() (*ast.I18nConfigNode, error) {
+	kw := p.advance() // i18n
+
+	defaultLocale := "en"
+	var locales []string
+
+	if p.cur().Type == lexer.TokenIdent && p.cur().Value == "default:" {
+		p.advance()
+		dTok := p.cur()
+		if dTok.Type != lexer.TokenIdent {
+			return nil, fmt.Errorf("line %d: expected locale after 'default:', got %q", dTok.Line, dTok.Value)
+		}
+		defaultLocale = dTok.Value
+		p.advance()
+	}
+
+	if p.cur().Type == lexer.TokenIdent && p.cur().Value == "locales:" {
+		p.advance()
+		if p.cur().Type != lexer.TokenLBracket {
+			return nil, fmt.Errorf("line %d: expected '[' after 'locales:', got %q", p.cur().Line, p.cur().Value)
+		}
+		p.advance()
+		for p.cur().Type != lexer.TokenRBracket && p.cur().Type != lexer.TokenEOF {
+			if p.cur().Type == lexer.TokenIdent || p.cur().Type == lexer.TokenString {
+				locales = append(locales, p.cur().Value)
+				p.advance()
+			}
+			if p.cur().Type == lexer.TokenComma {
+				p.advance()
+				continue
+			}
+		}
+		if err := p.expect(lexer.TokenRBracket); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := p.expect(lexer.TokenColon); err != nil {
+		return nil, err
+	}
+
+	return &ast.I18nConfigNode{
+		DefaultLocale: defaultLocale,
+		Locales:       locales,
+		Line:          kw.Line,
 	}, nil
 }
 

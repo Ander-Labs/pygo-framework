@@ -1,0 +1,9 @@
+{
+  "greeting": "¡Hola, {name}!",
+  "welcome": "Bienvenido a PyGo, {name}.",
+  "customer_created": "Cliente {name} creado con email {email}.",
+  "report_title": "Reporte de {model}",
+  "error": "Error: {msg}",
+  "job_queued": "Trabajo {job_id} encolado.",
+  "job_done": "Trabajo {job_id} completado."
+}

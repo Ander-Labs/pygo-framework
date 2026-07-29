@@ -15,6 +15,7 @@ Response frame (Python -> Go): {"result": <any>, "error": <CrossError|None>}
 from __future__ import annotations
 
 import inspect
+import json
 import os
 import socket
 import struct
@@ -33,6 +34,40 @@ HANDLERS: Dict[str, Callable[..., Any]] = {}
 # Per-request tenant, set from Go-side args["tenant"]. Because the Go
 # supervisor serializes CallPython with a mutex, a single global is safe.
 from core.runtime.db import set_tenant as _set_tenant  # noqa: E402
+
+# i18n: load locale dictionaries from core/runtime/locales/*.json
+_I18N_LOCALES: Dict[str, Dict[str, str]] = {}
+_I18N_DEFAULT = "en"
+
+def _load_locales() -> None:
+    """Load all *.json files from core/runtime/locales/ into _I18N_LOCALES."""
+    global _I18N_LOCALES
+    base = os.path.join(os.path.dirname(__file__), "..", "locales")
+    base = os.path.abspath(base)
+    if not os.path.isdir(base):
+        return
+    for fname in os.listdir(base):
+        if fname.endswith(".json"):
+            lang = fname[:-5]
+            try:
+                with open(os.path.join(base, fname), "r", encoding="utf-8") as f:
+                    _I18N_LOCALES[lang] = json.load(f)
+            except Exception:
+                pass  # ignore malformed locale files
+
+_load_locales()
+
+def t(key: str, locale: str = "en", **params) -> str:
+    """Translate a key for the given locale. Falls back to 'en' then to key itself.
+    Supports {param} formatting in the translation string."""
+    dict_ = _I18N_LOCALES.get(locale, _I18N_LOCALES.get(_I18N_DEFAULT, {}))
+    val = dict_.get(key, key)
+    if params:
+        try:
+            val = val.format(**params)
+        except Exception:
+            pass
+    return val
 
 DEFAULT_SOCKET_PATH = "/tmp/pygo.sock"
 
@@ -136,11 +171,16 @@ def dispatch(handler: str, args: Dict[str, Any]) -> Dict[str, Any]:
         # Lightweight boundary validation: coerce URL-string args to the
         # handler's declared parameter types.
         sig = inspect.signature(fn)
-        clean = {
-            k: v
-            for k, v in (args or {}).items()
-            if not k.startswith("_") and k != "tenant"
-        }
+        # Get handler's accepted parameter names
+        accepted_params = set(sig.parameters.keys())
+        clean = {}
+        for k, v in (args or {}).items():
+            if k == "tenant":
+                continue
+            # Include underscore-prefixed args only if handler accepts them
+            if k.startswith("_") and k not in accepted_params:
+                continue
+            clean[k] = v
         for name, param in sig.parameters.items():
             if name in clean and isinstance(clean[name], str):
                 ann = param.annotation

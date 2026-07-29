@@ -31,6 +31,8 @@ const (
 	TokenHandler
 	TokenFunction
 	TokenWorker
+	TokenReport
+	TokenI18n
 
 	// Type keywords
 	TokenType_ // a recognized DSL type name (String, Int, ...)
@@ -80,6 +82,10 @@ func (t TokenType) String() string {
 		return "FUNCTION"
 	case TokenWorker:
 		return "WORKER"
+	case TokenReport:
+		return "REPORT"
+	case TokenI18n:
+		return "I18N"
 	case TokenType_:
 		return "TYPE"
 	case TokenColon:
@@ -134,6 +140,8 @@ var keywords = map[string]TokenType{
 	"handler":  TokenHandler,
 	"function": TokenFunction,
 	"worker":   TokenWorker,
+	"report":   TokenReport,
+	"i18n":     TokenI18n,
 }
 
 // dslTypes is the set of recognized DSL type names (Fase 0).

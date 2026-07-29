@@ -224,3 +224,17 @@ func exportName(s string) string {
 	}
 	return strings.Join(parts, "")
 }
+
+// VisitReport emits a GET handler that returns a CSV report from the model.
+// The handler delegates to Python via CallPython with the report name.
+func (g *GoGenerator) VisitReport(n *ast.ReportNode) (interface{}, error) {
+	g.buf.WriteString(fmt.Sprintf("	r.Handle(\"GET\", %q, func(args map[string]interface{}) (interface{}, error) {\n", n.Path))
+	g.buf.WriteString(fmt.Sprintf("		return runtime.CallPython(%q, args)\n", n.Name))
+	g.buf.WriteString("	}, false, false)\n")
+	return nil, nil
+}
+
+// VisitI18nConfig emits nothing in Go (i18n is handled in Python runtime).
+func (g *GoGenerator) VisitI18nConfig(n *ast.I18nConfigNode) (interface{}, error) {
+	return nil, nil
+}

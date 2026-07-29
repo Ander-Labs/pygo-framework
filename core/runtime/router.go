@@ -58,15 +58,17 @@ func (r *Router) Handle(method, path string, h func(args map[string]any) (any, e
 			return
 		}
 		args := map[string]any{}
-		extractPathParams(req, path, args)
-		for k, v := range req.URL.Query() {
-			if len(v) > 0 {
-				args[k] = v[0]
+			extractPathParams(req, path, args)
+			for k, v := range req.URL.Query() {
+				if len(v) > 0 {
+					args[k] = v[0]
+				}
 			}
-		}
-		if tenant {
-			args["tenant"] = TenantFromRequest(req)
-		}
+			// i18n: extract locale from Accept-Language header
+						args["_lang"] = localeFromRequest(req)
+			if tenant {
+				args["tenant"] = TenantFromRequest(req)
+			}
 		if auth {
 			claims, ok := extractAuth(req)
 			if !ok {
@@ -270,4 +272,21 @@ func writeError(w http.ResponseWriter, err error) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_, _ = fmt.Fprintf(w, `{"error":%q}`, msg)
+}
+
+// localeFromRequest extracts the preferred locale from Accept-Language header.
+// Returns "es" for Spanish, "en" otherwise (extendable).
+func localeFromRequest(req *http.Request) string {
+	al := req.Header.Get("Accept-Language")
+	if al == "" {
+		return "en"
+	}
+	// Simple parse: accept "es", "es-ES", "en", "en-US", etc.
+	if len(al) >= 2 {
+		lang := strings.ToLower(al[:2])
+		if lang == "es" || lang == "fr" || lang == "de" || lang == "pt" {
+			return lang
+		}
+	}
+	return "en"
 }

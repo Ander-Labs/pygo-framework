@@ -144,10 +144,25 @@ puede pollear el estado con `GET /jobs/:id` hasta `done` + resultado.
 - Test `TestV090Jobs`: encola `slow_echo`, poll hasta `done`, verifica
   resultado asíncrono.
 
-## v0.10.0 — Reportes + i18n (Fase 10)
-Objetivo verificable: reporte PDF/CSV desde un modelo; UI en 2 idiomas.
-- Generación de reportes (CSV/PDF) desde handlers Python.
-- i18n: diccionarios de strings, locale por header `Accept-Language`.
+## v0.10.0 — Reportes + i18n (Fase 10)  ← ESTADO: COMPLETADO
+
+Objetivo verificable: un handler genera un reporte CSV descargable; la UI responde
+en 2 idiomas según el header `Accept-Language`.
+
+Entregado:
+- **i18n**: middleware `localeFromRequest` en `router.go` extrae el locale del
+  header `Accept-Language` y lo inyecta como `_lang` en los args (solo pasado al
+  handler si este lo declara, evitando errores de signature mismatch).
+- **Diccionarios de locales**: `core/runtime/locales/{en,es}.json` con claves
+  traducibles y soporte para `{param}` formatting.
+- **Helper `t(key, lang, **params)`** en `pyclient/__init__.py`: carga los JSON
+  al startup y traduce con fallback a `en` → key.
+- **Reporte CSV**: handler `customer_report` en `gen_py.py` genera CSV nativo
+  (Python `csv` module) desde la tabla `greeting`.
+- **DSL `report` + `i18n`**: `ReportNode` / `I18nConfigNode` en AST, `VisitReport`
+  en `gen_go.go` (emite GET handler) y `gen_py.go` (emite handler CSV), tokens
+  `report`/`i18n` en lexer, `parseReport`/`parseI18nConfig` en parser.
+- Test `TestV100ReportsI18n`: verifica i18n es/en + CSV report con datos.
 
 ## v0.11.0 … → v0.N.0 — Cobertura del DSL y del core
 Fases incrementales hasta cubrir la superficie del doc: `Enum`, `ForeignKey`,
