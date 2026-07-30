@@ -131,6 +131,13 @@ func (g *GoGenerator) VisitProgram(n *ast.Program) (interface{}, error) {
 		}
 	}
 
+	// Cruds -> generate handlers and routes inline.
+	for _, c := range n.Cruds {
+		if _, err := c.Accept(g); err != nil {
+			return nil, err
+		}
+	}
+
 	// Routes -> registration function.
 	g.buf.WriteString("// RegisterRoutes wires the generated routes into a router.\n")
 	g.buf.WriteString("// The router type is intentionally an interface stub for Fase 0; the\n")
@@ -319,47 +326,36 @@ func (g *GoGenerator) VisitForeignKey(n *ast.ForeignKeyNode) (interface{}, error
 }
 
 // VisitCrud emits Go handlers for CRUD operations on a model.
+// Routes are registered separately via crud_route helper.
 func (g *GoGenerator) VisitCrud(n *ast.CrudNode) (interface{}, error) {
 	// Generate REST handlers for the model
 	modelName := n.Name
 	handlerBase := "crud_" + strings.ToLower(modelName)
-	
+
 	// GET /model - list all
-	g.buf.WriteString(fmt.Sprintf("// GET /%s -> list\n", strings.ToLower(modelName)))
 	g.buf.WriteString(fmt.Sprintf("func Handler_%s_list(args map[string]interface{}) (interface{}, error) {\n", handlerBase))
-	g.buf.WriteString(fmt.Sprintf("\t// TODO: fetch all %s from DB\n", modelName))
-	g.buf.WriteString("\treturn nil, nil\n}\n")
-	
+	g.buf.WriteString(fmt.Sprintf("	// TODO: fetch all %s from DB\n", modelName))
+	g.buf.WriteString("	return nil, nil\n}\n\n")
+
 	// GET /model/:id - get by id
-	g.buf.WriteString(fmt.Sprintf("// GET /%s/:id -> get\n", strings.ToLower(modelName)))
 	g.buf.WriteString(fmt.Sprintf("func Handler_%s_get(args map[string]interface{}) (interface{}, error) {\n", handlerBase))
-	g.buf.WriteString(fmt.Sprintf("\t// TODO: fetch %s by id from DB\n", modelName))
-	g.buf.WriteString("\treturn nil, nil\n}\n")
-	
+	g.buf.WriteString(fmt.Sprintf("	// TODO: fetch %s by id from DB\n", modelName))
+	g.buf.WriteString("	return nil, nil\n}\n\n")
+
 	// POST /model - create
-	g.buf.WriteString(fmt.Sprintf("// POST /%s -> create\n", strings.ToLower(modelName)))
 	g.buf.WriteString(fmt.Sprintf("func Handler_%s_create(args map[string]interface{}) (interface{}, error) {\n", handlerBase))
-	g.buf.WriteString(fmt.Sprintf("\t// TODO: create %s from args\n", modelName))
-	g.buf.WriteString("\treturn nil, nil\n}\n")
-	
+	g.buf.WriteString(fmt.Sprintf("	// TODO: create %s from args\n", modelName))
+	g.buf.WriteString("	return nil, nil\n}\n\n")
+
 	// PUT /model/:id - update
-	g.buf.WriteString(fmt.Sprintf("// PUT /%s/:id -> update\n", strings.ToLower(modelName)))
 	g.buf.WriteString(fmt.Sprintf("func Handler_%s_update(args map[string]interface{}) (interface{}, error) {\n", handlerBase))
-	g.buf.WriteString(fmt.Sprintf("\t// TODO: update %s by id from args\n", modelName))
-	g.buf.WriteString("\treturn nil, nil\n}\n")
-	
+	g.buf.WriteString(fmt.Sprintf("	// TODO: update %s by id from args\n", modelName))
+	g.buf.WriteString("	return nil, nil\n}\n\n")
+
 	// DELETE /model/:id - delete
-	g.buf.WriteString(fmt.Sprintf("// DELETE /%s/:id -> delete\n", strings.ToLower(modelName)))
 	g.buf.WriteString(fmt.Sprintf("func Handler_%s_delete(args map[string]interface{}) (interface{}, error) {\n", handlerBase))
-	g.buf.WriteString(fmt.Sprintf("\t// TODO: delete %s by id\n", modelName))
-	g.buf.WriteString("\treturn nil, nil\n}\n")
-	
-	// Register routes
-	g.buf.WriteString(fmt.Sprintf("\tr.Handle(\"GET\", \"/%s\", Handler_%s_list)\n", strings.ToLower(modelName), handlerBase))
-	g.buf.WriteString(fmt.Sprintf("\tr.Handle(\"GET\", \"/%s/:id\", Handler_%s_get)\n", strings.ToLower(modelName), handlerBase))
-	g.buf.WriteString(fmt.Sprintf("\tr.Handle(\"POST\", \"/%s\", Handler_%s_create)\n", strings.ToLower(modelName), handlerBase))
-	g.buf.WriteString(fmt.Sprintf("\tr.Handle(\"PUT\", \"/%s/:id\", Handler_%s_update)\n", strings.ToLower(modelName), handlerBase))
-	g.buf.WriteString(fmt.Sprintf("\tr.Handle(\"DELETE\", \"/%s/:id\", Handler_%s_delete)\n", strings.ToLower(modelName), handlerBase))
-	
+	g.buf.WriteString(fmt.Sprintf("	// TODO: delete %s by id\n", modelName))
+	g.buf.WriteString("	return nil, nil\n}\n\n")
+
 	return nil, nil
 }

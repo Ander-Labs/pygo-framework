@@ -196,3 +196,44 @@ Ver [ROADMAP.md](ROADMAP.md) para el plan de desarrollo.
 ## Créditos
 
 Desarrollado por Anderson Ruiz (Ander-Labs).
+
+## CLI
+
+The PyGo CLI provides commands for project management:
+
+```sh
+# Create a new project
+pygo new my-app
+
+# Development mode (transpile and serve)
+pygo dev
+
+# Build for production
+pygo build --embed-python
+
+# Transpile .pgo files
+pygo gen web/app.pgo
+
+# Run tests
+pygo test -v
+
+# Database commands (coming soon)
+pygo db migrate
+pygo db rollback
+
+# Module management (coming soon)
+pygo module install <name>
+pygo module list
+```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `new <name>` | Create a new PyGo project |
+| `dev` | Transpile and start dev server |
+| `build` | Build for production |
+| `gen [file]` | Transpile .pgo files |
+| `test` | Run tests |
+| `db migrate` | Run database migrations |
+| `module install` | Install a module |

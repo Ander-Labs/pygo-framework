@@ -126,7 +126,14 @@ func (p *Parser) Parse() (*ast.Program, error) {
 			}
 			prog.Enums = append(prog.Enums, e)
 			prog.Decls = append(prog.Decls, e)
-		case lexer.TokenForeignKey:
+		case lexer.TokenCrud:
+		c, err := p.parseCrud()
+		if err != nil {
+			return nil, err
+		}
+		prog.Cruds = append(prog.Cruds, c)
+		prog.Decls = append(prog.Decls, c)
+	case lexer.TokenForeignKey:
 			fk, err := p.parseForeignKey()
 			if err != nil {
 				return nil, err

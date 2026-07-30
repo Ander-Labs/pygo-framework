@@ -24,6 +24,8 @@ Commands:
   new <name>    Create a new PyGo project in ./<name>/
   dev           Transpile the first .pgo file and start the dev server (:8080)
   build         Build for production (use --embed-python for a single binary)
+  gen [file]    Transpile .pgo files to Go/Python
+  test          Run tests for the project
 
 Run "pygo <command> -h" for command-specific flags.
 `
@@ -45,6 +47,10 @@ func main() {
 		err = runDev(args)
 	case "build":
 		err = runBuild(args)
+	case "gen":
+		err = runGen(args)
+	case "test":
+		err = runTest(args)
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 		return
