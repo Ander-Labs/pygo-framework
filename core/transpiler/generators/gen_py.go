@@ -346,6 +346,9 @@ func (g *PyGenerator) VisitEnum(n *ast.EnumNode) (interface{}, error) {
 	return nil, nil
 }
 
+
+
+
 // VisitForeignKey emits Python relationship helpers.
 // Generates get_<name>() method and lazy property for the target model.
 func (g *PyGenerator) VisitForeignKey(n *ast.ForeignKeyNode) (interface{}, error) {

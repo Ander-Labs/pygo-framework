@@ -204,7 +204,21 @@ Suite completa: **runtime 10/10 + transpiler 1/1 PASS**.
 - `core/transpiler/generators/gen_py.go`: JOINs en `VisitModel`
 - `core/transpiler/generators/gen_go.go`: JOINs en `VisitModel`
 
-## v0.13.0 … → v0.N.0 — Cobertura del DSL y del core
+## v0.13.0 — Type mappings UUID/Email/DateTime (Fase 13)
+
+**Objetivo verificable:** los tipos `UUID`, `Email`, `DateTime`, `URL`, `Phone` se mapean correctamente a Python `str`/`datetime` y Go `string`/`time.Time`.
+
+### Implementación
+- **UUID**: `id: UUID` → Go `Id string` + Python `id: str`
+- **Email**: `email: Email` → Go `Email string` + Python `email: str`
+- **DateTime**: `created: DateTime` → Go `Created time.Time` + Python `created: datetime`
+- **URL**: `url: URL` → Go `URL string` + Python `url: str`
+- **Phone**: `phone: Phone` → Go `Phone string` + Python `phone: str`
+
+### Archivo modificado
+- `core/transpiler/v130_test.go`: test `TestV130TypeValidation`
+
+## v0.14.0 … → v0.N.0 — Cobertura del DSL y del core
 
 ## v1.0.0 — Primera versión estable
 - Hot-reload, multi-tenancy, background jobs, reportes disponibles.
