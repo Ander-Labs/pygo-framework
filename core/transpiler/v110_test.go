@@ -76,8 +76,16 @@ model Order:
 		t.Fatalf("py missing enum class:\n%s", pyOut)
 	}
 	if !strings.Contains(pyOut, "extras: dict[str, str]") {
-			t.Fatalf("py missing Map metadata:\\n%s", pyOut)
+			t.Fatalf("py missing Map metadata:\n%s", pyOut)
 		}
 
-	t.Logf("v0.11.0 DSL types OK")
+		// ForeignKey JOINs - verify field type is string (placeholder for FK id)
+			if !strings.Contains(goOut, "Ref string") {
+				t.Fatalf("go missing ForeignKey field:\n%s", goOut)
+			}
+			if !strings.Contains(pyOut, "ref: str") {
+				t.Fatalf("py missing ForeignKey field:\n%s", pyOut)
+			}
+
+			t.Logf("v0.11.0 DSL types OK")
 }

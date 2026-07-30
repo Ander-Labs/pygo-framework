@@ -185,6 +185,16 @@ func (g *PyGenerator) VisitModel(n *ast.ModelNode) (interface{}, error) {
 	g.buf.WriteString("        if data.get(\"id\") is None and rowid is not None:\n")
 	g.buf.WriteString("            data[\"id\"] = rowid\n")
 	g.buf.WriteString("        return cls(**data)\n\n")
+
+	// ForeignKey JOINs: generate get_<field>() methods for ForeignKey[T] fields.
+	for _, f := range n.Fields {
+		if f.Type != nil && f.Type.Name == "ForeignKey" && f.Type.Inner != nil {
+			target := f.Type.Inner.Name
+			g.buf.WriteString(fmt.Sprintf("    def get_%s(self) -> %s:\n", f.Name, target))
+			g.buf.WriteString(fmt.Sprintf("        \"\"\"Fetch the related %s by this %s field.\"\"\"\n", target, f.Name))
+			g.buf.WriteString(fmt.Sprintf("        return %s.find(self.%s)\n\n", target, f.Name))
+		}
+	}
 	return nil, nil
 }
 
@@ -336,7 +346,12 @@ func (g *PyGenerator) VisitEnum(n *ast.EnumNode) (interface{}, error) {
 	return nil, nil
 }
 
-// VisitForeignKey emits Python relationship helpers (placeholder; actual fetch is in runtime).
+// VisitForeignKey emits Python relationship helpers.
+// Generates get_<name>() method and lazy property for the target model.
 func (g *PyGenerator) VisitForeignKey(n *ast.ForeignKeyNode) (interface{}, error) {
+	g.buf.WriteString(fmt.Sprintf("# ForeignKey: %s -> %s\n", n.Name, n.Target))
+	g.buf.WriteString(fmt.Sprintf("def get_%s(self):\n", n.Name))
+	g.buf.WriteString(fmt.Sprintf("    \"\"\"Fetch the related %s by %s.\"\"\"\n", n.Target, n.Name))
+	g.buf.WriteString(fmt.Sprintf("    return %s.find(self.%s)\n\n", n.Target, n.Name))
 	return nil, nil
 }

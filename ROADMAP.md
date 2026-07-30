@@ -191,10 +191,20 @@ v0.11.0 DSL types OK
 ```
 Suite completa: **runtime 10/10 + transpiler 1/1 PASS**.
 
-## v0.12.0 … → v0.N.0 — Cobertura del DSL y del core
-Fases incrementales hasta cubrir la superficie del doc: `Enum`, `ForeignKey`,
-`Array/Map`, admin panel, auditoría, API REST automática, bus de eventos, etc.
-Cada una = un `v0.N.0` con su test.
+## v0.12.0 — ForeignKey JOINs automáticos (Fase 12)
+
+**Objetivo verificable:** campo `ref: ForeignKey[User]` genera método `get_ref()` que fetch del User relacionado.
+
+### Implementación
+- **Python**: `VisitModel` detecta campos `ForeignKey[T]` y genera `def get_<name>(self) -> T:`
+- **Go**: `VisitModel` genera `func (m *Model) Get<Name>() *T` stub
+- Los métodos usan `Model.find()` del runtime
+
+### Archivos modificados
+- `core/transpiler/generators/gen_py.go`: JOINs en `VisitModel`
+- `core/transpiler/generators/gen_go.go`: JOINs en `VisitModel`
+
+## v0.13.0 … → v0.N.0 — Cobertura del DSL y del core
 
 ## v1.0.0 — Primera versión estable
 - Hot-reload, multi-tenancy, background jobs, reportes disponibles.
