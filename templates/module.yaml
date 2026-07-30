@@ -1,0 +1,74 @@
+# Module manifest for PyGo
+# This file defines a PyGo module
+
+module:
+  name: my-module
+  version: 1.0.0
+  pygo_version: ">=1.0.0"
+  author: Your Name
+  description: A PyGo module
+  license: AGPL-3.0
+  homepage: https://pygo.dev
+  repository: https://github.com/your-org/my-module
+
+dependencies:
+  modules:
+    - core
+    - auth
+  python_packages:
+    - requests>=2.28.0
+    - psycopg>=3.1.0
+
+permissions:
+  read:
+    - user:read
+    - product:read
+  write:
+    - user:write
+    - product:write
+  admin:
+    - user:admin
+    - system:admin
+
+hooks:
+  on_install: hooks/install.py
+  on_uninstall: hooks/uninstall.py
+  on_enable: hooks/enable.py
+  on_disable: hooks/disable.py
+  on_update: hooks/update.py
+
+ui:
+  menu_items:
+    - label: Products
+      path: /products
+      icon: box
+      permission: product:read
+    - label: Orders
+      path: /orders
+      icon: receipt
+      permission: order:read
+
+routes:
+  prefix: /my-module
+  auto_generate: true
+
+models:
+  path: models/
+  pattern: "*.pgo"
+  auto_register: true
+
+views:
+  path: views/
+  engine: htmx
+  tailwind: true
+
+assets:
+  path: static/
+  styles:
+    - main.css
+  scripts:
+    - main.js
+
+migrations:
+  path: migrations/
+  auto_migrate: true

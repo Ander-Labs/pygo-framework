@@ -1,6 +1,6 @@
-"""PyGo Module System (v0.29.0).
+"""PyGo Module System (v0.39.0).
 
-Provides module management, lifecycle hooks, and permissions.
+Provides module management, loading, and lifecycle hooks.
 """
 
 from __future__ import annotations
@@ -8,241 +8,262 @@ from __future__ import annotations
 import os
 import yaml
 import importlib.util
-from typing import Optional, Dict, List, Any
-from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional, Dict, Any, List
+from dataclasses import dataclass, field
+from contextlib import contextmanager
+
+import sys
 
 
 @dataclass
-class ModuleInfo:
-    """Information about a PyGo module."""
+class ModuleManifest:
+    """Module manifest parsed from module.yaml."""
     name: str
-    version: str
-    description: str = ""
+    version: str = "1.0.0"
+    pygo_version: str = ">=1.0.0"
     author: str = ""
-    entry: str = "app.py"
-    dependencies: List[str] = field(default_factory=list)
-    permissions: List[str] = field(default_factory=list)
-    enabled: bool = True
+    description: str = ""
+    license: str = "AGPL-3.0"
+    homepage: str = ""
+    repository: str = ""
+    
+    dependencies: Dict[str, List[str]] = field(default_factory=dict)
+    permissions: Dict[str, List[str]] = field(default_factory=dict)
+    hooks: Dict[str, str] = field(default_factory=dict)
+    ui: Dict[str, Any] = field(default_factory=dict)
+    routes: Dict[str, Any] = field(default_factory=dict)
+    models: Dict[str, Any] = field(default_factory=dict)
+    views: Dict[str, Any] = field(default_factory=dict)
+    assets: Dict[str, Any] = field(default_factory=dict)
+    migrations: Dict[str, Any] = field(default_factory=dict)
     
     @classmethod
-    def from_yaml(cls, path: str) -> "ModuleInfo":
-        """Load module info from module.yaml file."""
-        with open(path, 'r') as f:
+    def from_yaml(cls, path: str) -> "ModuleManifest":
+        """Load manifest from YAML file."""
+        with open(path) as f:
             data = yaml.safe_load(f)
+        
+        module = data.get("module", {})
         return cls(
-            name=data.get("name", Path(path).parent.name),
-            version=data.get("version", "0.0.1"),
-            description=data.get("description", ""),
-            author=data.get("author", ""),
-            entry=data.get("entry", "app.py"),
-            dependencies=data.get("dependencies", []),
-            permissions=data.get("permissions", []),
-            enabled=data.get("enabled", True)
+            name=module.get("name", "unknown"),
+            version=module.get("version", "1.0.0"),
+            pygo_version=module.get("pygo_version", ">=1.0.0"),
+            author=module.get("author", ""),
+            description=module.get("description", ""),
+            license=module.get("license", "AGPL-3.0"),
+            homepage=module.get("homepage", ""),
+            repository=module.get("repository", ""),
+            dependencies=data.get("dependencies", {"modules": [], "python_packages": []}),
+            permissions=data.get("permissions", {}),
+            hooks=data.get("hooks", {}),
+            ui=data.get("ui", {}),
+            routes=data.get("routes", {}),
+            models=data.get("models", {}),
+            views=data.get("views", {}),
+            assets=data.get("assets", {}),
+            migrations=data.get("migrations", {}),
         )
 
 
 @dataclass
 class Module:
-    """A loaded PyGo module."""
-    info: ModuleInfo
+    """Loaded PyGo module."""
+    manifest: ModuleManifest
     path: Path
-    _app_module: Any = None
+    is_enabled: bool = False
     
-    def load(self) -> bool:
-        """Load the module's entry point."""
-        entry_path = self.path / self.info.entry
-        if not entry_path.exists():
-            return False
-        
-        spec = importlib.util.spec_from_file_location(
-            f"module_{self.info.name}",
-            str(entry_path)
-        )
-        if spec is None or spec.loader is None:
-            return False
-        
-        self._app_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(self._app_module)
-        return True
+    @property
+    def name(self) -> str:
+        return self.manifest.name
     
-    def unload(self) -> None:
-        """Unload the module."""
-        self._app_module = None
-    
-    def get_handler(self, name: str) -> Any:
-        """Get a handler from the module."""
-        if self._app_module is None:
-            return None
-        return getattr(self._app_module, name, None)
+    @property
+    def routes_prefix(self) -> str:
+        return self.manifest.routes.get("prefix", f"/{self.name}")
 
 
 class ModuleManager:
-    """Manages PyGo modules."""
+    """Manages PyGo modules: install, enable, disable, list."""
     
-    def __init__(self, modules_dir: str = "modules"):
-        self.modules_dir = Path(modules_dir)
-        self.modules_dir.mkdir(exist_ok=True)
+    MODULES_DIR = Path("modules")
+    
+    def __init__(self, modules_dir: Optional[str] = None):
+        self.modules_dir = Path(modules_dir) if modules_dir else self.MODULES_DIR
         self._modules: Dict[str, Module] = {}
-        self._hooks: Dict[str, Dict[str, Any]] = {}
+        self._load_modules()
     
-    def discover_modules(self) -> Dict[str, ModuleInfo]:
-        """Discover all modules in the modules directory."""
-        modules = {}
-        for module_path in self.modules_dir.iterdir():
-            if module_path.is_dir():
-                module_yaml = module_path / "module.yaml"
-                if module_yaml.exists():
+    def _load_modules(self) -> None:
+        """Load all modules from the modules directory."""
+        if not self.modules_dir.exists():
+            self.modules_dir.mkdir(parents=True, exist_ok=True)
+            return
+        
+        for module_dir in self.modules_dir.iterdir():
+            if module_dir.is_dir():
+                manifest_path = module_dir / "module.yaml"
+                if manifest_path.exists():
                     try:
-                        info = ModuleInfo.from_yaml(str(module_yaml))
-                        modules[info.name] = info
+                        manifest = ModuleManifest.from_yaml(str(manifest_path))
+                        self._modules[manifest.name] = Module(
+                            manifest=manifest,
+                            path=module_dir,
+                            is_enabled=(module_dir / ".enabled").exists()
+                        )
                     except Exception as e:
-                        print(f"Warning: Failed to load module from {module_yaml}: {e}")
-        return modules
+                        print(f"Warning: Failed to load module from {module_dir}: {e}")
     
-    def load_module(self, name: str) -> bool:
-        """Load a module by name."""
-        modules = self.discover_modules()
-        if name not in modules:
-            return False
-        
-        info = modules[name]
-        module_path = self.modules_dir / name
-        
-        module = Module(info=info, path=module_path)
-        if module.load():
-            self._modules[name] = module
-            return True
-        return False
+    def list_modules(self) -> List[Module]:
+        """List all available modules."""
+        return list(self._modules.values())
     
-    def unload_module(self, name: str) -> bool:
-        """Unload a module by name."""
-        if name not in self._modules:
-            return False
-        self._modules[name].unload()
+    def get_module(self, name: str) -> Optional[Module]:
+        """Get a module by name."""
+        return self._modules.get(name)
+    
+    def install(self, source: str, name: Optional[str] = None) -> bool:
+        """Install a module from a source (path, git URL, or package)."""
+        source_path = Path(source)
+        
+        if not source_path.exists():
+            # Could be a git URL or package name
+            raise NotImplementedError("Git/package installation not yet implemented")
+        
+        module_name = name or source_path.name
+        dest_path = self.modules_dir / module_name
+        
+        if dest_path.exists():
+            raise FileExistsError(f"Module {module_name} already exists")
+        
+        # Copy module directory
+        import shutil
+        shutil.copytree(source_path, dest_path)
+        
+        # Run install hook
+        self._run_hook(module_name, "on_install")
+        
+        # Reload modules
+        self._load_modules()
+        return True
+    
+    def enable(self, name: str) -> bool:
+        """Enable a module."""
+        module = self.get_module(name)
+        if not module:
+            raise ValueError(f"Module {name} not found")
+        
+        if not module.is_enabled:
+            # Create .enabled marker file
+            (module.path / ".enabled").touch()
+            module.is_enabled = True
+            self._run_hook(name, "on_enable")
+        
+        return True
+    
+    def disable(self, name: str) -> bool:
+        """Disable a module."""
+        module = self.get_module(name)
+        if not module:
+            raise ValueError(f"Module {name} not found")
+        
+        if module.is_enabled:
+            # Remove .enabled marker file
+            enabled_file = module.path / ".enabled"
+            if enabled_file.exists():
+                enabled_file.unlink()
+            module.is_enabled = False
+            self._run_hook(name, "on_disable")
+        
+        return True
+    
+    def uninstall(self, name: str) -> bool:
+        """Uninstall a module."""
+        module = self.get_module(name)
+        if not module:
+            raise ValueError(f"Module {name} not found")
+        
+        # Run uninstall hook
+        self._run_hook(name, "on_uninstall")
+        
+        # Remove module directory
+        import shutil
+        shutil.rmtree(module.path)
+        
+        # Remove from loaded modules
         del self._modules[name]
         return True
     
-    def is_module_enabled(self, name: str) -> bool:
-        """Check if a module is enabled."""
-        modules = self.discover_modules()
-        if name not in modules:
-            return False
-        return modules[name].enabled
-    
-    def enable_module(self, name: str) -> bool:
-        """Enable a module."""
-        modules = self.discover_modules()
-        if name not in modules:
-            return False
-        
-        module_yaml = self.modules_dir / name / "module.yaml"
-        with open(module_yaml, 'r') as f:
-            data = yaml.safe_load(f)
-        
-        data["enabled"] = True
-        with open(module_yaml, 'w') as f:
-            yaml.dump(data, f)
-        
-        return True
-    
-    def disable_module(self, name: str) -> bool:
-        """Disable a module."""
-        modules = self.discover_modules()
-        if name not in modules:
-            return False
-        
-        module_yaml = self.modules_dir / name / "module.yaml"
-        with open(module_yaml, 'r') as f:
-            data = yaml.safe_load(f)
-        
-        data["enabled"] = False
-        with open(module_yaml, 'w') as f:
-            yaml.dump(data, f)
-        
-        if name in self._modules:
-            self.unload_module(name)
-        
-        return True
-    
-    def list_modules(self) -> List[Dict[str, Any]]:
-        """List all modules with their status."""
-        all_modules = self.discover_modules()
-        loaded = set(self._modules.keys())
-        
-        result = []
-        for name, info in all_modules.items():
-            result.append({
-                "name": name,
-                "version": info.version,
-                "description": info.description,
-                "author": info.author,
-                "enabled": info.enabled,
-                "loaded": name in loaded,
-                "dependencies": info.dependencies,
-                "permissions": info.permissions
-            })
-        return result
-    
-    def check_permissions(self, name: str, permission: str) -> bool:
-        """Check if a module has a specific permission."""
-        modules = self.discover_modules()
-        if name not in modules:
-            return False
-        return permission in modules[name].permissions
-    
-    # Lifecycle hooks
-    def run_hook(self, name: str, hook: str, *args, **kwargs) -> Any:
+    def _run_hook(self, module_name: str, hook_name: str) -> bool:
         """Run a lifecycle hook for a module."""
-        if name not in self._hooks:
-            self._hooks[name] = {}
+        module = self.get_module(module_name)
+        if not module:
+            return False
         
-        hook_func = self._hooks[name].get(hook)
-        if hook_func:
-            return hook_func(*args, **kwargs)
-        return None
+        hook_path = module.manifest.hooks.get(hook_name)
+        if not hook_path:
+            return True  # No hook defined
+        
+        hook_file = module.path / hook_path
+        if not hook_file.exists():
+            return True  # Hook file doesn't exist
+        
+        try:
+            # Execute hook as Python script
+            with open(hook_file) as f:
+                code = f.read()
+            
+            # Save current directory and change to module directory
+            old_cwd = os.getcwd()
+            os.chdir(module.path)
+            
+            try:
+                # Execute in module context
+                namespace = {"module": module, "manifest": module.manifest, "os": os}
+                exec(code, namespace)
+                return True
+            finally:
+                os.chdir(old_cwd)
+        except Exception as e:
+            print(f"Warning: Hook {hook_name} failed for module {module_name}: {e}")
+            return False
     
-    def register_hook(self, name: str, hook: str, func: Any) -> None:
-        """Register a lifecycle hook for a module."""
-        if name not in self._hooks:
-            self._hooks[name] = {}
-        self._hooks[name][hook] = func
+    def get_routes(self) -> Dict[str, Any]:
+        """Get all routes from enabled modules."""
+        routes = {}
+        for module in self.list_modules():
+            if module.is_enabled:
+                prefix = module.routes_prefix
+                routes[prefix] = {
+                    "module": module.name,
+                    "auto_generate": module.manifest.routes.get("auto_generate", False)
+                }
+        return routes
+    
+    def get_models(self) -> Dict[str, Path]:
+        """Get all model files from enabled modules."""
+        models = {}
+        for module in self.list_modules():
+            if module.is_enabled:
+                models_path = module.path / module.manifest.models.get("path", "models/")
+                if models_path.exists():
+                    for model_file in models_path.glob(module.manifest.models.get("pattern", "*.pgo")):
+                        models[model_file.name] = model_file
+        return models
 
 
 # Global module manager instance
-_manager: Optional[ModuleManager] = None
+_module_manager: Optional[ModuleManager] = None
 
 
-def get_manager() -> ModuleManager:
+def get_module_manager() -> ModuleManager:
     """Get the global module manager instance."""
-    global _manager
-    if _manager is None:
-        _manager = ModuleManager()
-    return _manager
+    global _module_manager
+    if _module_manager is None:
+        _module_manager = ModuleManager()
+    return _module_manager
 
 
-def install_module(name: str, url: Optional[str] = None) -> bool:
-    """Install a module from a URL or local path."""
-    # TODO: Implement module installation from URL
-    # For now, just load from local
-    return get_manager().load_module(name)
-
-
-def list_modules() -> List[Dict[str, Any]]:
-    """List all modules."""
-    return get_manager().list_modules()
-
-
-def enable_module(name: str) -> bool:
-    """Enable a module."""
-    return get_manager().enable_module(name)
-
-
-def disable_module(name: str) -> bool:
-    """Disable a module."""
-    return get_manager().disable_module(name)
-
-
-def check_permission(module: str, permission: str) -> bool:
-    """Check if a module has a permission."""
-    return get_manager().check_permissions(module, permission)
+def init_module_manager(modules_dir: Optional[str] = None) -> ModuleManager:
+    """Initialize the module manager with custom modules directory."""
+    global _module_manager
+    _module_manager = ModuleManager(modules_dir)
+    return _module_manager
