@@ -336,14 +336,37 @@ func (g *PyGenerator) VisitI18nConfig(n *ast.I18nConfigNode) (interface{}, error
 	return nil, nil
 }
 
-// VisitEnum emits a Python Enum class with string values.
+// VisitEnum emits a Python Enum class with string or int values.
+// Supports string values (enum Status: active inactive) and numeric (enum Status: active=1 inactive=2).
 func (g *PyGenerator) VisitEnum(n *ast.EnumNode) (interface{}, error) {
-	g.buf.WriteString(fmt.Sprintf("class %s(str, enum.Enum):\n", n.Name))
-	for _, v := range n.Values {
-		g.buf.WriteString(fmt.Sprintf("    %s = %q\n", v, v))
+	// Detect if values are numeric
+	isNumeric := len(n.Values) > 0 && n.Values[0].Value != "" && isNumericEnumValue(n.Values[0].Value)
+	if isNumeric {
+		g.buf.WriteString(fmt.Sprintf("class %s(int, enum.Enum):\n", n.Name))
+		for _, v := range n.Values {
+			g.buf.WriteString(fmt.Sprintf("    %s = %s\n", strings.ToUpper(v.Name), v.Value))
+		}
+	} else {
+		g.buf.WriteString(fmt.Sprintf("class %s(str, enum.Enum):\n", n.Name))
+		for _, v := range n.Values {
+			g.buf.WriteString(fmt.Sprintf("    %s = %q\n", v.Name, v.Value))
+		}
 	}
 	g.buf.WriteString("\n\n")
 	return nil, nil
+}
+
+// isNumericEnumValue checks if an enum value looks like a number.
+func isNumericEnumValue(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range s {
+		if (c < '0' || c > '9') && c != '-' && c != '+' {
+			return false
+		}
+	}
+	return true
 }
 
 

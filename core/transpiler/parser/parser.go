@@ -490,7 +490,7 @@ func (p *Parser) parseI18nConfig() (*ast.I18nConfigNode, error) {
 	}, nil
 }
 
-// parseEnum parses: enum Name: val1 val2 val3
+// parseEnum parses: enum Name: val1=val1 val2=val2 or val1 val2
 func (p *Parser) parseEnum() (*ast.EnumNode, error) {
 	kw := p.advance() // enum
 	nameTok := p.cur()
@@ -501,15 +501,30 @@ func (p *Parser) parseEnum() (*ast.EnumNode, error) {
 	if err := p.expect(lexer.TokenColon); err != nil {
 		return nil, err
 	}
-	var values []string
+	var values []ast.EnumValue
 	for {
 		t := p.cur()
 		if t.Type == lexer.TokenEOF || t.Type == lexer.TokenDedent {
 			break
 		}
 		if t.Type == lexer.TokenIdent {
-			values = append(values, t.Value)
+			name := t.Value
 			p.advance()
+			// Check for =value
+			var value string
+			if p.cur().Type == lexer.TokenAssign {
+				p.advance() // consume =
+				valTok := p.cur()
+				if valTok.Type == lexer.TokenString {
+					value = valTok.Value
+				} else if valTok.Type == lexer.TokenIdent || valTok.Type == lexer.TokenNumber {
+					value = valTok.Value
+				}
+				p.advance()
+			} else {
+				value = name // default: name = value
+			}
+			values = append(values, ast.EnumValue{Name: name, Value: value})
 			continue
 		}
 		if t.Type == lexer.TokenComma || t.Type == lexer.TokenArrow || t.Type == lexer.TokenNewline || t.Type == lexer.TokenIndent {

@@ -14,6 +14,12 @@ type Node interface {
 	node()
 }
 
+// EnumValue is a single enum member with optional value.
+type EnumValue struct {
+	Name  string // e.g. "active"
+	Value string // e.g. "1" (empty means auto-generate from name)
+}
+
 // Visitor is implemented by generators (gen_go, gen_py) and any AST consumer.
 type Visitor interface {
 	VisitProgram(n *Program) (interface{}, error)
@@ -170,11 +176,12 @@ func (n *I18nConfigNode) Accept(v Visitor) (interface{}, error) {
 	return v.VisitI18nConfig(n)
 }
 
-// EnumNode is an `enum` declaration: a named set of string values.
+// EnumNode is an `enum` declaration: a named set of values.
 // e.g. enum Status: active inactive pending
+// or: enum Status: active=1 inactive=2 pending=3
 type EnumNode struct {
 	Name   string
-	Values []string
+	Values []EnumValue
 	Line   int
 }
 

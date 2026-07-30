@@ -272,16 +272,41 @@ func (g *GoGenerator) VisitI18nConfig(n *ast.I18nConfigNode) (interface{}, error
 	return nil, nil
 }
 
-// VisitEnum emits Go type aliases for enum values (string type constants).
+// VisitEnum emits Go type aliases for enum values.
+// Supports string values (enum Status: active inactive) and numeric (enum Status: active=1 inactive=2).
 func (g *GoGenerator) VisitEnum(n *ast.EnumNode) (interface{}, error) {
-	g.buf.WriteString(fmt.Sprintf("type %s string\n", n.Name))
-	g.buf.WriteString("const (\n")
-	for _, v := range n.Values {
-		name := exportName(v)
-		g.buf.WriteString(fmt.Sprintf("	%s%s %s = %q\n", n.Name, name, n.Name, v))
+	// Detect if values are numeric
+	isNumeric := len(n.Values) > 0 && n.Values[0].Value != "" && isNumericValue(n.Values[0].Value)
+	if isNumeric {
+		g.buf.WriteString(fmt.Sprintf("type %s int\n", n.Name))
+		g.buf.WriteString("const (\n")
+		for _, v := range n.Values {
+			name := exportName(v.Name)
+			g.buf.WriteString(fmt.Sprintf("	%s%s %s = %s\n", n.Name, name, n.Name, v.Value))
+		}
+	} else {
+		g.buf.WriteString(fmt.Sprintf("type %s string\n", n.Name))
+		g.buf.WriteString("const (\n")
+		for _, v := range n.Values {
+			name := exportName(v.Name)
+			g.buf.WriteString(fmt.Sprintf("	%s%s %s = %q\n", n.Name, name, n.Name, v.Value))
+		}
 	}
 	g.buf.WriteString(")\n\n")
 	return nil, nil
+}
+
+// isNumericValue checks if a string looks like a number.
+func isNumericValue(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range s {
+		if (c < '0' || c > '9') && c != '-' && c != '+' {
+			return false
+		}
+	}
+	return true
 }
 
 // VisitForeignKey emits Go helper method for foreign key references.
