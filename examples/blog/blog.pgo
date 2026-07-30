@@ -1,0 +1,79 @@
+# Blog example application (v0.19.0)
+
+enum Status:
+  draft
+  published
+  archived
+
+enum Role:
+  admin=1
+  author=2
+  reader=3
+
+model User:
+  id: UUID
+  email: Email
+  name: String
+  role: Role
+  created: DateTime
+
+model Post:
+  id: UUID
+  title: String
+  content: String
+  status: Status
+  author_id: UUID
+  author: ForeignKey[User]
+  tags: Array[String]
+  created: DateTime
+  updated: DateTime?
+
+model Comment:
+  id: UUID
+  post_id: UUID
+  post: ForeignKey[Post]
+  author_id: UUID
+  author: ForeignKey[User]
+  content: String
+  created: DateTime
+
+handler createPost:
+  create(title: String, content: String, author_id: UUID, tags: Array[String]) -> Post:
+    from datetime import datetime
+    from core.runtime.validators import validate_email, validate_uuid
+    
+    post = Post(
+      title=title,
+      content=content,
+      status=Status.draft,
+      author_id=validate_uuid(author_id),
+      tags=tags or [],
+      created=datetime.now()
+    )
+    post.save()
+    return post
+
+handler getPost:
+  get(id: UUID) -> Post:
+    return Post.find(validate_uuid(id))
+
+handler listPosts:
+  list(status: Status = Status.published) -> Array[Post]:
+    # TODO: implement filtering by status
+    return Post.all()
+
+handler createComment:
+  create(post_id: UUID, author_id: UUID, content: String) -> Comment:
+    comment = Comment(
+      post_id=validate_uuid(post_id),
+      author_id=validate_uuid(author_id),
+      content=content,
+      created=datetime.now()
+    )
+    comment.save()
+    return comment
+
+route GET /posts -> listPosts
+route GET /posts/:id -> getPost
+route POST /posts -> createPost
+route POST /posts/:id/comments -> createComment
