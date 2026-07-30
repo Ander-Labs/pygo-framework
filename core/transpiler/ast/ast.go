@@ -137,7 +137,7 @@ func (n *FunctionNode) Accept(v Visitor) (interface{}, error) {
 }
 
 // WorkerNode is a `worker` declaration: an async job handler that runs in the
-// background queue, not blocking the HTTP request.
+// background queue, not blocking the HTTP request. Its body is Python, executed via CallPython.
 type WorkerNode struct {
 	Name   string
 	Params []*FieldNode
@@ -194,9 +194,9 @@ func (n *EnumNode) Accept(v Visitor) (interface{}, error) {
 // ForeignKeyNode is a `foreignKey` declaration: a named reference to another model.
 // e.g. foreignKey User
 type ForeignKeyNode struct {
-	Name       string // field name
-	Target     string // model name it references
-	Line       int
+	Name   string // field name
+	Target string // model name it references
+	Line   int
 }
 
 func (n *ForeignKeyNode) node() {}
@@ -204,11 +204,21 @@ func (n *ForeignKeyNode) Accept(v Visitor) (interface{}, error) {
 	return v.VisitForeignKey(n)
 }
 
+// CrudRoute represents a single CRUD route generated from crud ModelName.
+type CrudRoute struct {
+	Method  string
+	Path    string
+	Handler string
+}
+
 // CrudNode represents an auto-generated CRUD API for a model.
 // Syntax: crud ModelName
+// Generates 5 REST routes: list, get, create, update, delete
 type CrudNode struct {
-	Line int    // line number for error messages
-	Name string // model name to generate CRUD handlers for
+	Line    int    // line number for error messages
+	Name    string // model name to generate CRUD handlers for
+	Routes  []CrudRoute // generated routes (populated by generator)
+	HandlerPrefix string // prefix for generated handler names
 }
 
 func (n *CrudNode) node() {}

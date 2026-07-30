@@ -688,12 +688,29 @@ func (p *Parser) expectOptional(tt lexer.TokenType) {
 }
 
 // parseCrud parses: crud ModelName
+// Generates 5 REST routes: list, get, create, update, delete
 func (p *Parser) parseCrud() (*ast.CrudNode, error) {
 	kw := p.advance() // crud
 	nameTok := p.cur()
 	if nameTok.Type != lexer.TokenIdent {
 		return nil, fmt.Errorf("line %d: expected model name after crud, got %q", nameTok.Line, nameTok.Value)
 	}
+	modelName := nameTok.Value
 	p.advance()
-	return &ast.CrudNode{Name: nameTok.Value, Line: kw.Line}, nil
+
+	// Generate standard CRUD routes
+	routes := []ast.CrudRoute{
+		{Method: "GET", Path: "/" + strings.ToLower(modelName), Handler: "List" + modelName},
+		{Method: "GET", Path: "/" + strings.ToLower(modelName) + "/:id", Handler: "Get" + modelName},
+		{Method: "POST", Path: "/" + strings.ToLower(modelName), Handler: "Create" + modelName},
+		{Method: "PUT", Path: "/" + strings.ToLower(modelName) + "/:id", Handler: "Update" + modelName},
+		{Method: "DELETE", Path: "/" + strings.ToLower(modelName) + "/:id", Handler: "Delete" + modelName},
+	}
+
+	return &ast.CrudNode{
+		Name:            modelName,
+		Line:            kw.Line,
+		Routes:          routes,
+		HandlerPrefix:   "Crud" + modelName,
+	}, nil
 }
