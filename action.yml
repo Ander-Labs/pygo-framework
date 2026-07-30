@@ -1,0 +1,32 @@
+name: 'PyGo CLI'
+description: 'Modern web framework with Go backend and Python flexibility'
+author: 'Ander-Labs <andersonruizr2@gmail.com>'
+homepage: 'https://pygo.dev'
+bin: 'pygo'
+version: '0.35.0'
+cmd: 'pygo'
+license: 'AGPL-3.0'
+notes: |
+  ## PyGo CLI Installation Complete!
+  
+  ## Quick Start
+  1. Verify installation: `pygo --version`
+  2. Check your environment: `pygo doctor`
+  3. Create a new project: `pygo new my-app`
+  4. Start development: `cd my-app && pygo dev`
+  
+  ## Documentation
+  - Full docs: https://pygo.dev/docs
+  - API Reference: https://pygo.dev/docs/api
+  - Community: https://github.com/Ander-Labs/pygo/discussions
+  
+  ## Next Steps
+  \`\`\`bash
+  pygo doctor    # Check environment
+  pygo new .     # Create new project in current directory
+  pygo build     # Build production binary
+  pygo db migrate # Run database migrations
+  \`\`\`
+ 
+  ## License
+  AGPL-3.0 - See LICENSE file for details.

@@ -1,0 +1,11 @@
+# Dashboard handler - protected by authentication middleware
+handler dashboard:
+  get() -> HTML:
+    # This handler is protected by auth middleware
+    # Only authenticated users can access
+    return render_template("dashboard.html", {
+      "title": "Dashboard",
+      "user": ctx.user
+    })
+
+route GET /dashboard -> dashboard

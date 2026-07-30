@@ -1,0 +1,59 @@
+# GoReleaser configuration for PyGo Framework
+# Usage: go run github.com/goreleaser/goreleaser/v2 --release dist
+# Or via GitHub Actions on tag push
+
+version: 1
+
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    mod_tidy:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    binary: pygo
+    # Windows specific
+    windows:
+      icon: ./assets/icon.ico
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    compression_level: 0
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}.sha256"
+
+signs:
+  - args:
+      - "--batch"
+      - "--local-user"
+      - "{{ .SigningKey }}"
+
+release:
+  extra_files:
+    - glob: "assets/*"
+      name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}/{{ .Name }}"
+
+changelog:
+  use: github-native
+  sort: asc
+  filters:
+    exclude:
+      - "Merge pull request"
+      - "Merge branch"
+      - "docs:"
+      - "chore:"
+      - "ci:"

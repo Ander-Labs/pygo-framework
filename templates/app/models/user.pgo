@@ -1,0 +1,11 @@
+# User model with authentication support
+model User:
+  id: UUID
+  email: Email
+  password_hash: String
+  role: Enum
+  created_at: DateTime
+  updated_at: DateTime
+
+# Auto-generated routes via CRUD
+crud User
