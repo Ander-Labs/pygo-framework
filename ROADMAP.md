@@ -218,7 +218,18 @@ Suite completa: **runtime 10/10 + transpiler 1/1 PASS**.
 ### Archivo modificado
 - `core/transpiler/v130_test.go`: test `TestV130TypeValidation`
 
-## v0.14.0 … → v0.N.0 — Cobertura del DSL y del core
+## v0.14.0 — Optional + Decimal (Fase 14)
+
+**Objetivo verificable:** `Optional[T]` genera Go `*T` y Python `T | None`; `Decimal` se mapea a `string` (Go) y `Decimal` (Python).
+
+### Implementación
+- **Optional**: `name: String?` → Go `*string`, Python `name: str | None`
+- **Decimal**: `price: Decimal` → Go `string`, Python `Decimal`
+
+### Archivo modificado
+- `core/transpiler/v140_test.go`: test `TestV140OptionalDecimal`
+
+## v0.15.0 … → v0.N.0 — Cobertura del DSL y del core
 
 ## v1.0.0 — Primera versión estable
 - Hot-reload, multi-tenancy, background jobs, reportes disponibles.
