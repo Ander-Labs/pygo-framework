@@ -3,13 +3,23 @@
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(6)))),
+    id TEXT PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
+    password_hash TEXT,
     role TEXT DEFAULT 'user',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TEXT,
+    updated_at TEXT,
+    deleted_at TEXT
 );
 
--- Create index on email for faster lookups
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+-- Sessions table
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    token TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    created_at TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- @rollback: DROP TABLE IF EXISTS sessions; DROP TABLE IF EXISTS users;
