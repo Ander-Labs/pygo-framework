@@ -35,6 +35,7 @@ const (
 	TokenI18n
 	TokenEnum
 	TokenForeignKey
+	TokenCrud
 
 	// Type keywords
 	TokenType_ // a recognized DSL type name (String, Int, ...)
@@ -92,6 +93,8 @@ func (t TokenType) String() string {
 		return "ENUM"
 	case TokenForeignKey:
 		return "FOREIGN_KEY"
+	case TokenCrud:
+		return "CRUD"
 	case TokenType_:
 		return "TYPE"
 	case TokenColon:
@@ -150,6 +153,7 @@ var keywords = map[string]TokenType{
 	"i18n":       TokenI18n,
 	"enum":       TokenEnum,
 	"foreignKey": TokenForeignKey,
+	"crud":       TokenCrud,
 }
 
 // dslTypes is the set of recognized DSL type names (Fase 0).

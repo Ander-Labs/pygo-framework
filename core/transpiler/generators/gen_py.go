@@ -381,3 +381,50 @@ func (g *PyGenerator) VisitForeignKey(n *ast.ForeignKeyNode) (interface{}, error
 	g.buf.WriteString(fmt.Sprintf("    return %s.find(self.%s)\n\n", n.Target, n.Name))
 	return nil, nil
 }
+
+// VisitCrud emits Python handlers for CRUD operations on a model.
+func (g *PyGenerator) VisitCrud(n *ast.CrudNode) (interface{}, error) {
+	modelName := n.Name
+	handlerBase := "crud_" + strings.ToLower(modelName)
+	
+	// GET /model - list all
+	g.buf.WriteString(fmt.Sprintf("def %s_list(**args):\n", handlerBase))
+	g.buf.WriteString(fmt.Sprintf("    \"\"\"List all %s records.\"\"\"\n", modelName))
+	g.buf.WriteString(fmt.Sprintf("    return {modelName}.all()\n\n"))
+	
+	// GET /model/:id - get by id
+	g.buf.WriteString(fmt.Sprintf("def %s_get(id):\n", handlerBase))
+	g.buf.WriteString(fmt.Sprintf("    \"\"\"Get a %s by id.\"\"\"\n", modelName))
+	g.buf.WriteString(fmt.Sprintf("    return {modelName}.find(id)\n\n"))
+	
+	// POST /model - create
+	g.buf.WriteString(fmt.Sprintf("def %s_create(**fields):\n", handlerBase))
+	g.buf.WriteString(fmt.Sprintf("    \"\"\"Create a new %s.\"\"\"\n", modelName))
+	g.buf.WriteString(fmt.Sprintf("    return {modelName}.create(**fields)\n\n"))
+	
+	// PUT /model/:id - update
+	g.buf.WriteString(fmt.Sprintf("def %s_update(id, **fields):\n", handlerBase))
+	g.buf.WriteString(fmt.Sprintf("    \"\"\"Update a %s by id.\"\"\"\n", modelName))
+	g.buf.WriteString(fmt.Sprintf("    obj = {modelName}.find(id)\n"))
+	g.buf.WriteString(fmt.Sprintf("    for k, v in fields.items():\n"))
+	g.buf.WriteString(fmt.Sprintf("        setattr(obj, k, v)\n"))
+	g.buf.WriteString(fmt.Sprintf("    obj.save()\n"))
+	g.buf.WriteString(fmt.Sprintf("    return obj\n\n"))
+	
+	// DELETE /model/:id - delete
+	g.buf.WriteString(fmt.Sprintf("def %s_delete(id):\n", handlerBase))
+	g.buf.WriteString(fmt.Sprintf("    \"\"\"Delete a %s by id.\"\"\"\n", modelName))
+	g.buf.WriteString(fmt.Sprintf("    obj = {modelName}.find(id)\n"))
+	g.buf.WriteString(fmt.Sprintf("    if obj:\n"))
+	g.buf.WriteString(fmt.Sprintf("        obj.delete()\n"))
+	g.buf.WriteString(fmt.Sprintf("    return {\"deleted\": True}\n\n"))
+	
+	// Register handlers
+	g.buf.WriteString(fmt.Sprintf("HANDLERS[\"%s_list\"] = %s_list\n", handlerBase, handlerBase))
+	g.buf.WriteString(fmt.Sprintf("HANDLERS[\"%s_get\"] = %s_get\n", handlerBase, handlerBase))
+	g.buf.WriteString(fmt.Sprintf("HANDLERS[\"%s_create\"] = %s_create\n", handlerBase, handlerBase))
+	g.buf.WriteString(fmt.Sprintf("HANDLERS[\"%s_update\"] = %s_update\n", handlerBase, handlerBase))
+	g.buf.WriteString(fmt.Sprintf("HANDLERS[\"%s_delete\"] = %s_delete\n\n", handlerBase, handlerBase))
+	
+	return nil, nil
+}

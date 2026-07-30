@@ -317,3 +317,49 @@ func (g *GoGenerator) VisitForeignKey(n *ast.ForeignKeyNode) (interface{}, error
 	g.buf.WriteString("	return nil\n}\n")
 	return nil, nil
 }
+
+// VisitCrud emits Go handlers for CRUD operations on a model.
+func (g *GoGenerator) VisitCrud(n *ast.CrudNode) (interface{}, error) {
+	// Generate REST handlers for the model
+	modelName := n.Name
+	handlerBase := "crud_" + strings.ToLower(modelName)
+	
+	// GET /model - list all
+	g.buf.WriteString(fmt.Sprintf("// GET /%s -> list\n", strings.ToLower(modelName)))
+	g.buf.WriteString(fmt.Sprintf("func Handler_%s_list(args map[string]interface{}) (interface{}, error) {\n", handlerBase))
+	g.buf.WriteString(fmt.Sprintf("\t// TODO: fetch all %s from DB\n", modelName))
+	g.buf.WriteString("\treturn nil, nil\n}\n")
+	
+	// GET /model/:id - get by id
+	g.buf.WriteString(fmt.Sprintf("// GET /%s/:id -> get\n", strings.ToLower(modelName)))
+	g.buf.WriteString(fmt.Sprintf("func Handler_%s_get(args map[string]interface{}) (interface{}, error) {\n", handlerBase))
+	g.buf.WriteString(fmt.Sprintf("\t// TODO: fetch %s by id from DB\n", modelName))
+	g.buf.WriteString("\treturn nil, nil\n}\n")
+	
+	// POST /model - create
+	g.buf.WriteString(fmt.Sprintf("// POST /%s -> create\n", strings.ToLower(modelName)))
+	g.buf.WriteString(fmt.Sprintf("func Handler_%s_create(args map[string]interface{}) (interface{}, error) {\n", handlerBase))
+	g.buf.WriteString(fmt.Sprintf("\t// TODO: create %s from args\n", modelName))
+	g.buf.WriteString("\treturn nil, nil\n}\n")
+	
+	// PUT /model/:id - update
+	g.buf.WriteString(fmt.Sprintf("// PUT /%s/:id -> update\n", strings.ToLower(modelName)))
+	g.buf.WriteString(fmt.Sprintf("func Handler_%s_update(args map[string]interface{}) (interface{}, error) {\n", handlerBase))
+	g.buf.WriteString(fmt.Sprintf("\t// TODO: update %s by id from args\n", modelName))
+	g.buf.WriteString("\treturn nil, nil\n}\n")
+	
+	// DELETE /model/:id - delete
+	g.buf.WriteString(fmt.Sprintf("// DELETE /%s/:id -> delete\n", strings.ToLower(modelName)))
+	g.buf.WriteString(fmt.Sprintf("func Handler_%s_delete(args map[string]interface{}) (interface{}, error) {\n", handlerBase))
+	g.buf.WriteString(fmt.Sprintf("\t// TODO: delete %s by id\n", modelName))
+	g.buf.WriteString("\treturn nil, nil\n}\n")
+	
+	// Register routes
+	g.buf.WriteString(fmt.Sprintf("\tr.Handle(\"GET\", \"/%s\", Handler_%s_list)\n", strings.ToLower(modelName), handlerBase))
+	g.buf.WriteString(fmt.Sprintf("\tr.Handle(\"GET\", \"/%s/:id\", Handler_%s_get)\n", strings.ToLower(modelName), handlerBase))
+	g.buf.WriteString(fmt.Sprintf("\tr.Handle(\"POST\", \"/%s\", Handler_%s_create)\n", strings.ToLower(modelName), handlerBase))
+	g.buf.WriteString(fmt.Sprintf("\tr.Handle(\"PUT\", \"/%s/:id\", Handler_%s_update)\n", strings.ToLower(modelName), handlerBase))
+	g.buf.WriteString(fmt.Sprintf("\tr.Handle(\"DELETE\", \"/%s/:id\", Handler_%s_delete)\n", strings.ToLower(modelName), handlerBase))
+	
+	return nil, nil
+}

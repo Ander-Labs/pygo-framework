@@ -33,6 +33,7 @@ type Visitor interface {
 	VisitI18nConfig(n *I18nConfigNode) (interface{}, error)
 	VisitEnum(n *EnumNode) (interface{}, error)
 	VisitForeignKey(n *ForeignKeyNode) (interface{}, error)
+	VisitCrud(n *CrudNode) (interface{}, error)
 }
 
 // TypeRef describes a resolved DSL type reference, e.g. Optional[String],
@@ -203,9 +204,22 @@ func (n *ForeignKeyNode) Accept(v Visitor) (interface{}, error) {
 	return v.VisitForeignKey(n)
 }
 
+// CrudNode represents an auto-generated CRUD API for a model.
+// Syntax: crud ModelName
+type CrudNode struct {
+	Line int    // line number for error messages
+	Name string // model name to generate CRUD handlers for
+}
+
+func (n *CrudNode) node() {}
+func (n *CrudNode) Accept(v Visitor) (interface{}, error) {
+	return v.VisitCrud(n)
+}
+
 // Program is the root node holding all top-level declarations in order.
 type Program struct {
 	Models    []*ModelNode
+	Cruds     []*CrudNode
 	Routes    []*RouteNode
 	Handlers  []*HandlerNode
 	Functions []*FunctionNode

@@ -679,3 +679,14 @@ func (p *Parser) expectOptional(tt lexer.TokenType) {
 		p.advance()
 	}
 }
+
+// parseCrud parses: crud ModelName
+func (p *Parser) parseCrud() (*ast.CrudNode, error) {
+	kw := p.advance() // crud
+	nameTok := p.cur()
+	if nameTok.Type != lexer.TokenIdent {
+		return nil, fmt.Errorf("line %d: expected model name after crud, got %q", nameTok.Line, nameTok.Value)
+	}
+	p.advance()
+	return &ast.CrudNode{Name: nameTok.Value, Line: kw.Line}, nil
+}
