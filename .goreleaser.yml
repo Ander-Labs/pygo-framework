@@ -1,8 +1,6 @@
 # GoReleaser configuration for PyGo Framework
-# Usage: go run github.com/goreleaser/goreleaser/v2 --release dist
-# Or via GitHub Actions on tag push
-
-version: 1
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
 
 before:
   hooks:
@@ -10,12 +8,13 @@ before:
     - go generate ./...
 
 builds:
-  - env:
+  - id: pygo
+    binary: pygo
+    main: ./cli
+    env:
       - CGO_ENABLED=0
-    mod_tidy:
-      - -trimpath
     ldflags:
-      - -s -w -X main.version={{.Version}}
+      - -s -w
     goos:
       - linux
       - darwin
@@ -23,29 +22,22 @@ builds:
     goarch:
       - amd64
       - arm64
-    binary: pygo
-    # Windows specific
-    windows:
-      icon: ./assets/icon.ico
 
 archives:
-  - format: tar.gz
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    compression_level: 0
+  - id: tar
+    name_template: "pygo_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format: tar.gz
+  - id: zip
+    name_template: "pygo_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format: zip
 
 checksum:
-  name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}.sha256"
-
-signs:
-  - args:
-      - "--batch"
-      - "--local-user"
-      - "{{ .SigningKey }}"
+  name_template: "checksums.txt"
+  algorithm: sha256
 
 release:
-  extra_files:
-    - glob: "assets/*"
-      name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}/{{ .Name }}"
+  draft: false
+  prerelease: false
 
 changelog:
   use: github-native

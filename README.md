@@ -1,25 +1,42 @@
 # PyGo Framework
 
-A Go + Python monolit architecture with DSL code generation.
+An ultralight Go + Python full-stack framework with DSL code generation and HTMX UI.
 
 **Licencia:** AGPL-3.0
+**Documentación:** https://pygo-docs.vercel.app/
 
 ## Características
 
-- **DSL .pgo**: Lenguaje de dominio específico para definir modelos, handlers y rutas
-- **Code Generation**: Genera código Go (structs, handlers, routes) y Python (modelos ORM)
+- **`.pgo` DSL**: Lenguaje isomórfico a Python con code generation 1:1
+- **Code Generation**: Genera código Go (handlers, routes) y Python (modelos ORM)
 - **Type Mappings**: Soporte para UUID, Email, DateTime, URL, Phone, Decimal, Optional, Array, Map
-- **ForeignKey JOINs**: Generación automática de métodos de acceso para relaciones
+- **ForeignKey & JOINs**: Generación automática de métodos de acceso para relaciones
 - **Enum con valores**: Soporte para enums con valores numéricos o strings
+- **MessagePack + UDS**: Go↔Python interoperability via Unix Domain Sockets
+- **HTMX First**: UI server-driven, sin frameworks JavaScript cliente
+- **Ultra ligero**: Go `net/http` + Python `stdlib` only — cero frameworks pesados
 
 ## Instalación
 
 ```bash
-# Requisitos: Go 1.22+, Python 3.10+
-git clone https://github.com/Ander-Labs/pygo-framework
-cd pygo-framework
-go build ./...
+# Opción 1: Universal installer
+curl -fsSL https://pygo.dev/install.sh | bash
+
+# Opción 2: Desde el código fuente
+git clone https://github.com/Ander-Labs/pygo.git
+cd pygo
+go build -o pygo ./cmd/pygo
 ```
+
+## Comandos CLI
+
+| Command | Description |
+|---------|-------------|
+| `pygo new <name>` | Create a new PyGo project |
+| `pygo dev` | Transpile and start dev server |
+| `pygo build --embed-python` | Build for production |
+| `pygo gen [file]` | Generate gen_py.py and gen_go.go |
+| `pygo test` | Run tests |
 
 ## Uso rápido
 
@@ -53,13 +70,13 @@ route GET /hello/:name -> hello
 ### 2. Generar código
 
 ```bash
-go run ./cli/main.go transpile app.pgo
+pygo gen web/app.pgo
 ```
 
 ### 3. Ejecutar
 
 ```bash
-go run ./cli/main.go serve
+pygo dev
 ```
 
 ## DSL Reference
@@ -164,21 +181,41 @@ cd examples/blog
 go run ../cli/main.go serve
 ```
 
+## Ejemplos
+
+### Hello World
+
+```bash
+cd examples/hello-world
+pygo gen
+pygo dev
+```
+
+### Blog completo
+
+```bash
+cd examples/blog
+pygo gen
+pygo dev
+```
+
 ## Arquitectura
 
 ```
-pygo-framework/
-├── cli/           # CLI principal
+pygo/
+├── cmd/              # CLI entry point
+├── cli/              # CLI commands (new, dev, gen, build, test)
 ├── core/
-│   ├── transpiler/    # Parser y generadores
-│   │   ├── lexer/     # Lexer del DSL
-│   │   ├── parser/    # Parser del DSL
+│   ├── transpiler/   # Parser, lexer, AST, generators
+│   │   ├── lexer/
+│   │   ├── parser/
+│   │   ├── ast/
 │   │   └── generators/  # gen_go.go, gen_py.go
-│   └── runtime/       # Runtime Python
-│       ├── db.py      # ORM SQLite
-│       └── validators.py  # Validadores de tipos
-├── examples/       # Ejemplos de aplicaciones
-└── ROADMAP.md     # Roadmap de desarrollo
+│   └── runtime/      # Python runtime (db, validators, jobs, websockets)
+├── examples/         # Example applications
+├── templates/        # Project scaffolding templates
+├── scripts/          # Helper scripts
+└── install.sh        # Python dependency installer
 ```
 
 ## Roadmap
@@ -217,23 +254,17 @@ pygo gen web/app.pgo
 # Run tests
 pygo test -v
 
-# Database commands (coming soon)
-pygo db migrate
-pygo db rollback
-
-# Module management (coming soon)
-pygo module install <name>
-pygo module list
+# Environment health check
+pygo doctor
 ```
 
 ### Commands
 
 | Command | Description |
 |---------|-------------|
-| `new <name>` | Create a new PyGo project |
-| `dev` | Transpile and start dev server |
-| `build` | Build for production |
-| `gen [file]` | Transpile .pgo files |
-| `test` | Run tests |
-| `db migrate` | Run database migrations |
-| `module install` | Install a module |
+| `pygo new <name>` | Create a new PyGo project |
+| `pygo dev` | Transpile and start dev server |
+| `pygo build --embed-python` | Build for production |
+| `pygo gen [file]` | Generate gen_py.py and gen_go.go |
+| `pygo test` | Run tests |
+| `pygo doctor` | Check environment |
