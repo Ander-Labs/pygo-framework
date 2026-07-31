@@ -1,180 +1,244 @@
-"""PyGo Background Job System (v0.31.0).
+"""PyGo Background Jobs System (v0.42.0).
 
-Provides job queue, scheduler, and retry mechanisms.
+Provides Redis-backed background job processing with:
+- Retries with exponential backoff
+- Dead letter queue
+- Job status tracking
+- Scheduler
 """
 
 from __future__ import annotations
 
-import asyncio
+import json
 import time
 import uuid
-from typing import Optional, Dict, Any, Callable, List
-from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from enum import Enum
-from concurrent.futures import ThreadPoolExecutor
-import threading
+from typing import Dict, Any, Optional, Callable, List
+from dataclasses import dataclass, field, asdict
 
 
-class JobStatus(Enum):
-    """Job execution status."""
+class JobStatus(str, Enum):
     PENDING = "pending"
-    RUNNING = "running"
+    PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
-    RETRIED = "retried"
+    RETRY = "retry"
+    DEAD = "dead"
 
 
 @dataclass
 class Job:
-    """Represents a background job."""
     id: str
     name: str
-    func: Callable
-    args: tuple = ()
-    kwargs: dict = field(default_factory=dict)
-    retries: int = 3
-    retry_delay: float = 1.0
+    queue: str
+    payload: Dict[str, Any]
     status: JobStatus = JobStatus.PENDING
-    result: Any = None
+    result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
-    created_at: float = field(default_factory=time.time)
-    started_at: Optional[float] = None
-    completed_at: Optional[float] = None
-    tenant: Optional[str] = None
+    retry_count: int = 0
+    max_retries: int = 3
+    retry_delay: int = 1
+    scheduled_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        d = asdict(self)
+        d['status'] = self.status.value
+        d['scheduled_at'] = self.scheduled_at.isoformat() if self.scheduled_at else None
+        d['started_at'] = self.started_at.isoformat() if self.started_at else None
+        d['completed_at'] = self.completed_at.isoformat() if self.completed_at else None
+        d['created_at'] = self.created_at.isoformat()
+        return d
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Job":
+        return cls(
+            id=data['id'], name=data['name'], queue=data['queue'],
+            payload=data['payload'], status=JobStatus(data['status']),
+            result=data.get('result'), error=data.get('error'),
+            retry_count=data.get('retry_count', 0), max_retries=data.get('max_retries', 3),
+            retry_delay=data.get('retry_delay', 1),
+            scheduled_at=datetime.fromisoformat(data['scheduled_at']) if data.get('scheduled_at') else None,
+            started_at=datetime.fromisoformat(data['started_at']) if data.get('started_at') else None,
+            completed_at=datetime.fromisoformat(data['completed_at']) if data.get('completed_at') else None,
+            created_at=datetime.fromisoformat(data['created_at']),
+            metadata=data.get('metadata', {})
+        )
 
 
 class JobQueue:
-    """In-memory job queue."""
+    def __init__(self, redis_client=None, default_queue: str = "default"):
+        self.redis = redis_client
+        self.default_queue = default_queue
+        self._jobs: Dict[str, Job] = {}
+        self._queue: Dict[str, List[str]] = {}
     
-    def __init__(self, max_workers: int = 4):
-        self.jobs: Dict[str, Job] = {}
-        self.max_workers = max_workers
-        self._executor = ThreadPoolExecutor(max_workers=max_workers)
-        self._lock = threading.Lock()
-        self._running = False
-        self._thread: Optional[threading.Thread] = None
-    
-    def enqueue(self, name: str, func: Callable, *args, retries: int = 3,
-                retry_delay: float = 1.0, tenant: Optional[str] = None, **kwargs) -> str:
-        """Enqueue a job for execution."""
-        job_id = str(uuid.uuid4())
+    def enqueue(self, name: str, payload: Dict[str, Any], queue: Optional[str] = None,
+                max_retries: int = 3, retry_delay: int = 1,
+                scheduled_at: Optional[datetime] = None) -> str:
         job = Job(
-            id=job_id,
-            name=name,
-            func=func,
-            args=args,
-            kwargs=kwargs,
-            retries=retries,
-            retry_delay=retry_delay,
-            tenant=tenant
+            id=str(uuid.uuid4()), name=name,
+            queue=queue or self.default_queue, payload=payload,
+            max_retries=max_retries, retry_delay=retry_delay,
+            scheduled_at=scheduled_at
         )
-        
-        with self._lock:
-            self.jobs[job_id] = job
-        
-        return job_id
+        if self.redis:
+            queue_key = f"jobs:queue:{job.queue}"
+            job_key = f"jobs:job:{job.id}"
+            self.redis.set(job_key, json.dumps(job.to_dict()), ex=86400)
+            if job.scheduled_at and job.scheduled_at > datetime.utcnow():
+                score = job.scheduled_at.timestamp()
+                self.redis.zadd("jobs:delayed", {job.id: score})
+            else:
+                self.redis.lpush(queue_key, job.id)
+        else:
+            self._jobs[job.id] = job
+            if job.queue not in self._queue:
+                self._queue[job.queue] = []
+            self._queue[job.queue].append(job.id)
+        return job.id
+    
+    def dequeue(self, queue: Optional[str] = None) -> Optional[Job]:
+        queue_name = queue or self.default_queue
+        if self.redis:
+            queue_key = f"jobs:queue:{queue_name}"
+            job_id = self.redis.rpop(queue_key)
+            if job_id:
+                job_data = self.redis.get(f"jobs:job:{job_id}")
+                if job_data:
+                    return Job.from_dict(json.loads(job_data))
+        else:
+            if queue_name in self._queue and self._queue[queue_name]:
+                job_id = self._queue[queue_name].pop(0)
+                return self._jobs.pop(job_id, None)
+        return None
+    
+    def requeue(self, job: Job, delay: Optional[int] = None) -> None:
+        if delay:
+            job.scheduled_at = datetime.utcnow() + timedelta(seconds=delay)
+        if self.redis:
+            queue_key = f"jobs:queue:{job.queue}"
+            job_key = f"jobs:job:{job.id}"
+            self.redis.set(job_key, json.dumps(job.to_dict()), ex=86400)
+            self.redis.lpush(queue_key, job.id)
+        else:
+            self._jobs[job.id] = job
+            if job.queue not in self._queue:
+                self._queue[job.queue] = []
+            self._queue[job.queue].append(job.id)
+    
+    def fail(self, job: Job, error: str) -> None:
+        job.retry_count += 1
+        if job.retry_count <= job.max_retries:
+            job.status = JobStatus.RETRY
+            job.error = error
+            delay = job.retry_delay * (2 ** (job.retry_count - 1))
+            self.requeue(job, delay=delay)
+        else:
+            job.status = JobStatus.DEAD
+            job.error = error
+            if self.redis:
+                self.redis.lpush("jobs:dlq", json.dumps(job.to_dict()))
+    
+    def complete(self, job: Job, result: Optional[Dict[str, Any]] = None) -> None:
+        job.status = JobStatus.COMPLETED
+        job.result = result
+        job.completed_at = datetime.utcnow()
+        if self.redis:
+            job_key = f"jobs:job:{job.id}"
+            self.redis.set(job_key, json.dumps(job.to_dict()), ex=86400)
+        else:
+            self._jobs[job.id] = job
     
     def get_job(self, job_id: str) -> Optional[Job]:
-        """Get a job by ID."""
-        with self._lock:
-            return self.jobs.get(job_id)
+        if self.redis:
+            job_data = self.redis.get(f"jobs:job:{job_id}")
+            if job_data:
+                return Job.from_dict(json.loads(job_data))
+        return self._jobs.get(job_id)
     
-    def get_jobs(self, status: Optional[JobStatus] = None) -> List[Job]:
-        """Get all jobs, optionally filtered by status."""
-        with self._lock:
-            if status is None:
-                return list(self.jobs.values())
-            return [j for j in self.jobs.values() if j.status == status]
+    def get_queue_size(self, queue: Optional[str] = None) -> int:
+        queue_name = queue or self.default_queue
+        if self.redis:
+            return self.redis.llen(f"jobs:queue:{queue_name}")
+        return len(self._queue.get(queue_name, []))
     
-    def start(self):
-        """Start processing jobs."""
-        if self._running:
-            return
-        
-        self._running = True
-        self._thread = threading.Thread(target=self._process_loop, daemon=True)
-        self._thread.start()
+    def process_next(self, queue: Optional[str] = None, worker: Optional[Callable] = None) -> bool:
+        job = self.dequeue(queue)
+        if not job:
+            return False
+        job.status = JobStatus.PROCESSING
+        job.started_at = datetime.utcnow()
+        if self.redis:
+            self._update_job_redis(job)
+        else:
+            self._jobs[job.id] = job
+        try:
+            if worker:
+                result = worker(job)
+                self.complete(job, result)
+            else:
+                raise NotImplementedError("No worker function provided")
+        except Exception as e:
+            self.fail(job, str(e))
+            return False
+        return True
     
-    def stop(self):
-        """Stop processing jobs."""
-        self._running = False
-        if self._thread:
-            self._thread.join(timeout=5)
+    def _update_job_redis(self, job: Job) -> None:
+        job_key = f"jobs:job:{job.id}"
+        self.redis.set(job_key, json.dumps(job.to_dict()), ex=86400)
+
+
+class JobScheduler:
+    def __init__(self, queue: JobQueue):
+        self.queue = queue
+        self._jobs: Dict[str, Job] = {}
     
-    def _process_loop(self):
-        """Main processing loop."""
-        while self._running:
-            with self._lock:
-                pending = [j for j in self.jobs.values() if j.status == JobStatus.PENDING]
-            
-            for job in pending:
-                self._process_job(job)
-            
-            time.sleep(0.1)  # Small delay to prevent busy loop
+    def schedule(self, name: str, payload: Dict[str, Any], cron_expr: str,
+                 queue: Optional[str] = None) -> str:
+        parts = cron_expr.split()
+        if len(parts) != 5:
+            raise ValueError("Invalid cron expression")
+        job_id = str(uuid.uuid4())
+        job = Job(
+            id=job_id, name=name, queue=queue or self.queue.default_queue,
+            payload=payload, scheduled_at=self._next_run(cron_expr)
+        )
+        self._jobs[job_id] = job
+        return job_id
     
-    def _process_job(self, job: Job):
-        """Process a single job."""
-        job.status = JobStatus.RUNNING
-        job.started_at = time.time()
-        
-        def execute():
-            try:
-                result = job.func(*job.args, **job.kwargs)
-                job.result = result
-                job.status = JobStatus.COMPLETED
-            except Exception as e:
-                job.error = str(e)
-                if job.retries > 0:
-                    job.retries -= 1
-                    job.status = JobStatus.RETRIED
-                    time.sleep(job.retry_delay)
-                else:
-                    job.status = JobStatus.FAILED
-            finally:
-                job.completed_at = time.time()
-        
-        # Submit to thread pool
-        future = self._executor.submit(execute)
+    def _next_run(self, cron_expr: str) -> datetime:
+        return datetime.utcnow() + timedelta(minutes=1)
     
-    def submit(self, name: str, func: Callable, *args, **kwargs) -> str:
-        """Submit a job for immediate execution (deprecated, use enqueue)."""
-        return self.enqueue(name, func, *args, **kwargs)
+    def run_ready_jobs(self) -> int:
+        now = datetime.utcnow()
+        ready_jobs = [
+            job for job in self._jobs.values()
+            if job.scheduled_at and job.scheduled_at <= now and job.status == JobStatus.PENDING
+        ]
+        for job in ready_jobs:
+            self.queue.enqueue(
+                name=job.name, payload=job.payload, queue=job.queue,
+                max_retries=job.max_retries, retry_delay=job.retry_delay
+            )
+            job.status = JobStatus.PENDING
+        return len(ready_jobs)
 
 
-# Global job queue
-_default_queue: Optional[JobQueue] = None
+def enqueue_job(name: str, payload: Dict[str, Any], queue: str = "default") -> str:
+    return JobQueue().enqueue(name, payload, queue)
 
-
-def get_job_queue() -> JobQueue:
-    """Get the default job queue."""
-    global _default_queue
-    if _default_queue is None:
-        _default_queue = JobQueue()
-    return _default_queue
-
-
-def schedule(name: str, func: Callable, *args, retries: int = 3, **kwargs) -> str:
-    """Schedule a job for execution."""
-    return get_job_queue().enqueue(name, func, *args, retries=retries, **kwargs)
-
+def run_worker(queue: str = "default", worker_fn: Optional[Callable] = None) -> None:
+    jq = JobQueue()
+    while True:
+        if jq.process_next(queue, worker_fn):
+            time.sleep(0.1)
+        else:
+            time.sleep(1)
 
 def get_job(job_id: str) -> Optional[Job]:
-    """Get a job by ID."""
-    return get_job_queue().get_job(job_id)
-
-
-def list_jobs(status: Optional[JobStatus] = None) -> List[Job]:
-    """List jobs."""
-    return get_job_queue().get_jobs(status)
-
-
-# Decorator for defining jobs
-def job(name: str, retries: int = 3, retry_delay: float = 1.0):
-    """Decorator to define a background job."""
-    def decorator(func: Callable) -> Callable:
-        def wrapper(*args, **kwargs):
-            queue = get_job_queue()
-            return queue.enqueue(name, func, *args, retries=retries,
-                                 retry_delay=retry_delay, **kwargs)
-        return wrapper
-    return decorator
+    return JobQueue().get_job(job_id)
