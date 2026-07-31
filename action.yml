@@ -1,34 +1,65 @@
 name: 'PyGo CLI'
 description: 'Modern web framework with Go backend and Python flexibility'
 author: 'Ander-Labs <andersonruizr2@gmail.com>'
-homepage: 'https://pygo.dev'
-bin: 'pygo'
-version: '0.35.0'
-cmd: 'pygo'
-icon: 'package'
-color: '#2563EB'
-license: 'AGPL-3.0'
-notes: |
-  ## PyGo CLI Installation Complete!
-  
-  ## Quick Start
-  1. Verify installation: `pygo --version`
-  2. Check your environment: `pygo doctor`
-  3. Create a new project: `pygo new my-app`
-  4. Start development: `cd my-app && pygo dev`
-  
-  ## Documentation
-  - Full docs: https://pygo.dev/docs
-  - API Reference: https://pygo.dev/docs/api
-  - Community: https://github.com/Ander-Labs/pygo/discussions
-  
-  ## Next Steps
-  \`\`\`bash
-  pygo doctor    # Check environment
-  pygo new .     # Create new project in current directory
-  pygo build     # Build production binary
-  pygo db migrate # Run database migrations
-  \`\`\`
- 
-  ## License
-  AGPL-3.0 - See LICENSE file for details.
+branding:
+  icon: 'package'
+  color: 'blue'
+inputs:
+  version:
+    description: 'PyGo version to install (e.g., "v1.0.0" or "latest")'
+    required: false
+    default: 'latest'
+  install-python:
+    description: 'Whether to install Python 3.10+ automatically'
+    required: false
+    default: 'true'
+runs:
+  using: 'composite'
+  steps:
+    - name: Detect platform
+      shell: bash
+      run: |
+        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+        ARCH=$(uname -m)
+        case "$ARCH" in
+          x86_64|amd64) ARCH="amd64" ;;
+          arm64|aarch64) ARCH="arm64" ;;
+          *) echo "Unsupported architecture: $ARCH" && exit 1 ;;
+        esac
+        case "$RUNNER_OS" in
+          Linux) EXT="tar.gz" ;;
+          macOS) EXT="tar.gz" ;;
+          Windows) EXT="zip" ;;
+          *) echo "Unsupported OS" && exit 1 ;;
+        esac
+        echo "PLATFORM=${OS}_${ARCH}" >> $GITHUB_ENV
+        echo "EXT=${EXT}" >> $GITHUB_ENV
+
+    - name: Download PyGo CLI
+      shell: bash
+      run: |
+        VERSION="${{ inputs.version }}"
+        if [ "$VERSION" = "latest" ]; then
+          VERSION=$(curl -sL https://api.github.com/repos/Ander-Labs/pygo/releases/latest | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+        fi
+        URL="https://github.com/Ander-Labs/pygo/releases/download/${VERSION}/pygo_${VERSION#v}_${{ env.PLATFORM }}.${{ env.EXT }}"
+        echo "Downloading PyGo from: $URL"
+        curl -L "$URL" -o pygo.tar.${{ env.EXT }}
+        tar -xzf pygo.tar.${{ env.EXT }}
+        chmod +x pygo
+        echo "$RUNNER_WORKSPACE/pygo" >> $GITHUB_PATH
+
+    - name: Install Python (if enabled)
+      if: inputs.install-python == 'true'
+      shell: bash
+      run: |
+        if ! command -v python3 &> /dev/null; then
+          echo "Installing Python..."
+          sudo apt-get update && sudo apt-get install -y python3 python3-pip python3-venv
+        fi
+        python3 --version
+
+    - name: Verify installation
+      shell: bash
+      run: |
+        pygo version
