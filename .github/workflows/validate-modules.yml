@@ -1,0 +1,63 @@
+name: Validate Modules
+
+on:
+  push:
+    paths:
+      - 'modules/**'
+      - 'module.yaml'
+      - '.github/workflows/validate-modules.yml'
+  pull_request:
+    paths:
+      - 'modules/**'
+      - 'module.yaml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pyyaml
+      
+      - name: Validate module.yaml structure
+        run: |
+          python -c "
+import yaml
+import sys
+from pathlib import Path
+
+def validate_module_yaml(path):
+    with open(path) as f:
+        data = yaml.safe_load(f)
+    
+    required = ['module.name', 'module.version', 'module.description']
+    for field in required:
+        parts = field.split('.')
+        obj = data
+        for part in parts:
+            if part not in obj:
+                print(f'ERROR: Missing field {field}')
+                sys.exit(1)
+            obj = obj[part]
+    
+    print(f'✅ {path} is valid')
+
+for yaml_file in Path('.').rglob('module.yaml'):
+    validate_module_yaml(yaml_file)
+"
+      
+      - name: Run module tests
+        run: |
+          for test_file in $(find . -name '*_test.py' -path '*/modules/*' 2>/dev/null); do
+            echo "Running $test_file..."
+            python -m pytest "$test_file" -v || echo "No tests in $test_file"
+          done

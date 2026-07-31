@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "scopeName": "source.pygo",
+  "name": "PyGo",
+  "patterns": [
+    {
+      "name": "comment.line.double-sign",
+      "match": "//.*$"
+    },
+    {
+      "name": "comment.line.hash",
+      "match": "#.*$"
+    },
+    {
+      "name": "keyword.control",
+      "match": "\\b(crud|import|model|handler|view|route)\\b"
+    },
+    {
+      "name": "keyword.declaration",
+      "match": "\\b(struct|type|enum)\\b"
+    },
+    {
+      "name": "keyword.reserved",
+      "match": "\\b(if|else|elif|endif|for|while|end|do|done|return|break|continue)\\b"
+    },
+    {
+      "name": "keyword.operator",
+      "match": "\\b(and|or|not|in|is)\\b"
+    },
+    {
+      "name": "string.quoted.double",
+      "begin": "\"",
+      "end": "\""
+    },
+    {
+      "name": "string.quoted.single",
+      "begin": "'",
+      "end": "'"
+    },
+    {
+      "name": "constant.numeric",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    },
+    {
+      "name": "constant.language",
+      "match": "\\b(true|false|null)\\b"
+    }
+  ],
+  "repository": {
+    "compound_statements": {
+      "patterns": [
+        {
+          "include": "#main"
+        }
+      ]
+    }
+  }
+}

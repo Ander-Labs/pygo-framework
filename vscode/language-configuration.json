@@ -1,0 +1,29 @@
+{
+  "comments": {
+    "lineComment": "//",
+    "blockComment": ["/*", "*/"]
+  },
+  "brackets": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"]
+  ],
+  "autoClosingBrackets": ["{", "}", "[", "]", "(", ")"],
+  "autoClosingQuotes": ["\"", "'", "`"],
+  "surroundingPairs": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"],
+    ["<", ">"],
+    ["\"", "\""],
+    ["'", "'"]
+  ],
+  "keywords": ["crud", "import", "model", "handler", "view", "route", "struct", "type", "enum", "if", "else", "for", "while", "end", "do", "done", "return", "break", "continue"],
+  "patterns": [
+    {
+      "begin": "\"",
+      "end": "\"",
+      "name": "string.quoted.double"
+    }
+  ]
+}

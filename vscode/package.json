@@ -1,0 +1,49 @@
+{
+  "name": "pygo",
+  "displayName": "PyGo",
+  "description": "Syntax highlighting and snippets for PyGo files (.pgo)",
+  "version": "1.0.0",
+  "publisher": "Ander-Labs",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:pygo"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "pygo",
+        "aliases": ["PyGo", "pygo"],
+        "extensions": [".pgo"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "pygo",
+        "scopeName": "source.pygo",
+        "path": "./syntaxes/pygo.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "pygo",
+        "path": "./snippets/pygo.code-snippets"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -p . --watch"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.70.0",
+    "typescript": "^5.0.0"
+  }
+}

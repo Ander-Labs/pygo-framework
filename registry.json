@@ -1,0 +1,83 @@
+{
+  "modules": {
+    "official": {
+      "auth": {
+        "name": "pygo-module-auth",
+        "version": "1.0.0",
+        "description": "Authentication and authorization module",
+        "author": "Ander-Labs",
+        "license": "AGPL-3.0",
+        "url": "https://github.com/Ander-Labs/pygo-module-auth",
+        "downloads": 1200,
+        "rating": 4.8,
+        "tags": ["auth", "security", "jwt"],
+        "python_version": ">=3.9",
+        "pygo_version": ">=1.0.0",
+        "dependencies": []
+      },
+      "blog": {
+        "name": "pygo-module-blog",
+        "version": "1.2.0",
+        "description": "Complete blog engine with HTMX",
+        "author": "Ander-Labs",
+        "license": "AGPL-3.0",
+        "url": "https://github.com/Ander-Labs/pygo-module-blog",
+        "downloads": 850,
+        "rating": 4.7,
+        "tags": ["blog", "posts", "comments"],
+        "python_version": ">=3.9",
+        "pygo_version": ">=1.0.0",
+        "dependencies": ["auth"]
+      },
+      "shop": {
+        "name": "pygo-module-shop",
+        "version": "1.0.0",
+        "description": "E-commerce storefront",
+        "author": "Ander-Labs",
+        "license": "AGPL-3.0",
+        "url": "https://github.com/Ander-Labs/pygo-module-shop",
+        "downloads": 420,
+        "rating": 4.5,
+        "tags": ["ecommerce", "products", "orders"],
+        "python_version": ">=3.9",
+        "pygo_version": ">=1.0.0",
+        "dependencies": ["auth"]
+      },
+      "chat": {
+        "name": "pygo-module-chat",
+        "version": "1.1.0",
+        "description": "Real-time chat with WebSockets",
+        "author": "Ander-Labs",
+        "license": "AGPL-3.0",
+        "url": "https://github.com/Ander-Labs/pygo-module-chat",
+        "downloads": 680,
+        "rating": 4.6,
+        "tags": ["chat", "websocket", "realtime"],
+        "python_version": ">=3.9",
+        "pygo_version": ">=1.0.0",
+        "dependencies": ["auth"]
+      }
+    },
+    "community": {
+      "survey": {
+        "name": "pygo-module-survey",
+        "version": "0.9.0",
+        "description": "Survey and forms module",
+        "author": "Community",
+        "license": "MIT",
+        "url": "https://github.com/community/pygo-module-survey",
+        "downloads": 150,
+        "rating": 4.3,
+        "tags": ["forms", "survey", "polls"],
+        "python_version": ">=3.9",
+        "pygo_version": ">=1.0.0",
+        "dependencies": []
+      }
+    }
+  },
+  "metadata": {
+    "last_updated": "2024-07-31T12:00:00Z",
+    "total_modules": 6,
+    "total_downloads": 3300
+  }
+}

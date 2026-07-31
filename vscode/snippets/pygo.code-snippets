@@ -1,0 +1,77 @@
+{
+  "Model": {
+    "prefix": "model",
+    "body": [
+      "model ${1:ModelName}",
+      "\t${2:field}: ${3:str}",
+      "\t${4:field2}: ${5:int}",
+      "",
+      "\t# TODO: Add your model logic here"
+    ],
+    "description": "Define a PyGo model"
+  },
+  "Handler": {
+    "prefix": "handler",
+    "body": [
+      "handler ${1:handler_name}(ctx: Request) -> Response {",
+      "\t${2:// Your handler logic}",
+      "\treturn Response{",
+      "\t\tstatus: 200,",
+      "\t\tbody: ${3:\"Success\"}",
+      "\t}",
+      "}"
+    ],
+    "description": "Define a handler"
+  },
+  "Route": {
+    "prefix": "route",
+    "body": [
+      "route {",
+      "\tpath: \"/${1:api}/${2:resource}\",",
+      "\tmethod: \"${3:GET}\",",
+      "\thandler: ${4:handler_name}",
+      "}"
+    ],
+    "description": "Define a route"
+  },
+  "View": {
+    "prefix": "view",
+    "body": [
+      "view ${1:view_name} {",
+      "\ttemplate: \"${2:template}.html\",",
+      "\tlayout: \"${3:layout}\",",
+      "\tcontext: {",
+      "\t\t${4:key}: ${5:value}",
+      "\t}",
+      "}"
+    ],
+    "description": "Define a view"
+  },
+  "Import": {
+    "prefix": "import",
+    "body": [
+      "import {",
+      "\t\"${1:module}\": ${2:module}",
+      "}"
+    ],
+    "description": "Import a module"
+  },
+  "CRUD": {
+    "prefix": "crud",
+    "body": [
+      "crud ${1:ModelName}",
+      "\t# Generates: list, detail, create, update, delete handlers",
+      "\t# Generates: routes, views, tests"
+    ],
+    "description": "Generate CRUD operations"
+  },
+  "Struct": {
+    "prefix": "struct",
+    "body": [
+      "struct ${1:StructName} {",
+      "\t${2:field}: ${3:type},",
+      "}"
+    ],
+    "description": "Define a struct"
+  }
+}
