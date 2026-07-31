@@ -5,6 +5,8 @@ homepage: 'https://pygo.dev'
 bin: 'pygo'
 version: '0.35.0'
 cmd: 'pygo'
+icon: 'package'
+color: '#2563EB'
 license: 'AGPL-3.0'
 notes: |
   ## PyGo CLI Installation Complete!
