@@ -49,6 +49,8 @@ func main() {
 		err = runBuild(args)
 	case "gen":
 		err = runGen(args)
+	case "module":
+		err = runModule(args)
 	case "test":
 		err = runTest(args)
 	case "-h", "--help", "help":
