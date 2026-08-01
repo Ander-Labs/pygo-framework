@@ -1,91 +1,83 @@
 #!/bin/bash
 # PyGo Universal Installer
-# Usage: curl -fsSL https://pygo.dev/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/PyGo-Labs/pygo-framework/main/install.sh | bash
 
 set -e
 
-# Configuration
 PYGO_VERSION="${PYGO_VERSION:-latest}"
-PYGO_REPO="Ander-Labs/pygo"
+PYGO_REPO="PyGo-Labs/pygo-framework"
 PYGO_BIN="pygo"
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Detect OS and Arch
 detect_platform() {
-    OS="$(uname -s | tr '[' '[' | tr ']' '[')"
+    OS="$(uname -s)"
     ARCH="$(uname -m)"
-    
     case "$OS" in
         Linux*)  OS=linux ;;
         Darwin*) OS=darwin ;;
         CYGWIN*|MINGW*|MSYS*) OS=windows ;;
         *) echo -e "${RED}Unsupported OS: $OS${NC}"; exit 1 ;;
     esac
-    
     case "$ARCH" in
         x86_64|amd64) ARCH=amd64 ;;
         aarch64|arm64) ARCH=arm64 ;;
         armv7l) ARCH=arm ;;
         *) echo -e "${RED}Unsupported architecture: $ARCH${NC}"; exit 1 ;;
     esac
-    
     echo -e "${GREEN}Detected platform: ${OS}/${ARCH}${NC}"
 }
 
-# Get latest version from GitHub API
 get_latest_version() {
     if [ "$PYGO_VERSION" = "latest" ]; then
-        PYGO_VERSION=$(curl -s "https://api.github.com/repos/$PYGO_REPO/releases/latest" | grep -o '"tag_name": *"[^"]*"' | cut -d: -f2 | tr -d '" ')
+        PYGO_VERSION=$(curl -sL "https://api.github.com/repos/$PYGO_REPO/releases/latest" | sed -n 's/.*"tag_name": *"v\?\([^"]*\)".*/\1/p' | head -1)
         if [ -z "$PYGO_VERSION" ]; then
             echo -e "${RED}Failed to get latest version${NC}"
             exit 1
         fi
     fi
-    echo -e "${GREEN}Version: $PYGO_VERSION${NC}"
+    echo -e "${GREEN}Version: v$PYGO_VERSION${NC}"
 }
 
-# Download binary
 download_binary() {
-    local BINARY_NAME="${PYGO_BIN}_${PYGO_VERSION}_${OS}_${ARCH}"
-    local DOWNLOAD_URL="https://github.com/$PYGO_REPO/releases/download/$PYGO_VERSION/${PYGO_BIN}_${PYGO_VERSION}_${OS}_${ARCH}.tar.gz"
+    VERSION_TAG="v$PYGO_VERSION"
+    local DOWNLOAD_URL="https://github.com/$PYGO_REPO/releases/download/${VERSION_TAG}/${PYGO_BIN}_${VERSION_TAG}_${OS}_${ARCH}.tar.gz"
     
-    echo -e "${YELLOW}Downloading PyGo $PYGO_VERSION...${NC}"
+    echo -e "${YELLOW}Downloading PyGo $VERSION_TAG...${NC}"
     
     if [ "$OS" = "windows" ]; then
-        DOWNLOAD_URL="https://github.com/$PYGO_REPO/releases/download/$PYGO_VERSION/${PYGO_BIN}_${PYGO_VERSION}_${OS}_${ARCH}.zip"
+        DOWNLOAD_URL="https://github.com/$PYGO_REPO/releases/download/${VERSION_TAG}/${PYGO_BIN}_${VERSION_TAG}_${OS}_${ARCH}.zip"
         TEMP_DIR=$(mktemp -d)
         curl -fsSL "$DOWNLOAD_URL" -o "$TEMP_DIR/pygo.zip" || {
             echo -e "${RED}Download failed. Check your internet connection.${NC}"
             exit 1
         }
         unzip -o "$TEMP_DIR/pygo.zip" -d "$TEMP_DIR"
-        mv "$TEMP_DIR/$PYGO_BIN.exe" "/tmp/$PYGO_BIN.exe"
-        INSTALL_PATH="/tmp/$PYGO_BIN.exe"
+        mv "$TEMP_DIR/pygo.exe" "/tmp/pygo.exe"
+        INSTALL_PATH="/tmp/pygo.exe"
     else
         TEMP_DIR=$(mktemp -d)
-        curl -fsSL "$DOWNLOAD_URL" | tar -xz -C "$TEMP_DIR" || {
+        curl -fsSL "$DOWNLOAD_URL" -o "$TEMP_DIR/pygo.tar.gz" || {
             echo -e "${RED}Download failed. Check your internet connection.${NC}"
             exit 1
         }
+        tar -xzf "$TEMP_DIR/pygo.tar.gz" -C "$TEMP_DIR"
         INSTALL_PATH="$TEMP_DIR/$PYGO_BIN"
     fi
     
     echo -e "${GREEN}Download complete${NC}"
 }
 
-# Install binary
 install_binary() {
     local INSTALL_DIR
     
     if [ "$OS" = "windows" ]; then
         INSTALL_DIR="$USERPROFILE/bin"
         mkdir -p "$INSTALL_DIR"
-        mv "/tmp/$PYGO_BIN.exe" "$INSTALL_DIR/$PYGO_BIN.exe"
+        mv "/tmp/pygo.exe" "$INSTALL_DIR/$PYGO_BIN.exe"
         INSTALL_PATH="$INSTALL_DIR/$PYGO_BIN.exe"
     else
         INSTALL_DIR="/usr/local/bin"
@@ -101,13 +93,11 @@ install_binary() {
     echo -e "${GREEN}Installed to: $INSTALL_PATH${NC}"
 }
 
-# Verify installation
 verify_installation() {
     echo -e "${YELLOW}Verifying installation...${NC}"
     
     if command -v "$PYGO_BIN" &> /dev/null; then
-        VERSION=$("$PYGO_BIN" --version)
-        echo -e "${GREEN}Success! $VERSION${NC}"
+        echo -e "${GREEN}Success! $PYGO_BIN is ready.${NC}"
     else
         echo -e "${RED}Installation failed. $PYGO_BIN not found in PATH.${NC}"
         echo -e "${YELLOW}Try adding to your PATH: export PATH=\$PATH:$INSTALL_DIR${NC}"
@@ -115,12 +105,10 @@ verify_installation() {
     fi
 }
 
-# Cleanup
 cleanup() {
     rm -rf "$TEMP_DIR" 2>/dev/null || true
 }
 
-# Main
 main() {
     echo -e "${GREEN}========================================${NC}"
     echo -e "${GREEN}  PyGo Universal Installer${NC}"
@@ -141,7 +129,7 @@ main() {
     echo -e "Next steps:"
     echo -e "  1. Run: ${YELLOW}pygo doctor${NC} to verify your environment"
     echo -e "  2. Run: ${YELLOW}pygo new my-app${NC} to create a new project"
-    echo -e "  3. Visit: ${YELLOW}https://pygo.dev/docs${NC} for documentation"
+    echo -e "  3. Visit: ${YELLOW}https://pygo-docs.vercel.app/${NC} for documentation"
     echo -e ""
 }
 
