@@ -134,3 +134,4 @@ main() {
 }
 
 main "$@"
+# Force cache refresh
