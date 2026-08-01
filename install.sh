@@ -44,12 +44,13 @@ get_latest_version() {
 
 download_binary() {
     VERSION_TAG="v$PYGO_VERSION"
-    local DOWNLOAD_URL="https://github.com/$PYGO_REPO/releases/download/${VERSION_TAG}/${PYGO_BIN}_${VERSION_TAG}_${OS}_${ARCH}.tar.gz"
+    local ASSET_VERSION="$PYGO_VERSION"
+    local DOWNLOAD_URL="https://github.com/$PYGO_REPO/releases/download/${VERSION_TAG}/${PYGO_BIN}_${ASSET_VERSION}_${OS}_${ARCH}.tar.gz"
     
     echo -e "${YELLOW}Downloading PyGo $VERSION_TAG...${NC}"
     
     if [ "$OS" = "windows" ]; then
-        DOWNLOAD_URL="https://github.com/$PYGO_REPO/releases/download/${VERSION_TAG}/${PYGO_BIN}_${VERSION_TAG}_${OS}_${ARCH}.zip"
+        DOWNLOAD_URL="https://github.com/$PYGO_REPO/releases/download/${VERSION_TAG}/${PYGO_BIN}_${ASSET_VERSION}_${OS}_${ARCH}.zip"
         TEMP_DIR=$(mktemp -d)
         curl -fsSL "$DOWNLOAD_URL" -o "$TEMP_DIR/pygo.zip" || {
             echo -e "${RED}Download failed. Check your internet connection.${NC}"
