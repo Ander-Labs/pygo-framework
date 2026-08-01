@@ -20,11 +20,11 @@ An ultralight Go + Python full-stack framework with DSL code generation and HTMX
 
 ```bash
 # Opción 1: Universal installer
-curl -fsSL https://pygo.dev/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/PyGo-Labs/pygo-framework/main/install.sh | bash
 
 # Opción 2: Desde el código fuente
-git clone https://github.com/Ander-Labs/pygo.git
-cd pygo
+git clone https://github.com/PyGo-Labs/pygo-framework.git
+cd pygo-framework
 go build -o pygo ./cmd/pygo
 ```
 
