@@ -38,7 +38,8 @@ detect_platform() {
 
 get_latest_version() {
     if [ "$PYGO_VERSION" = "latest" ]; then
-        PYGO_VERSION=$(curl -s "https://api.github.com/repos/$PYGO_REPO/releases/latest" | grep -o '"tag_name": *"[^"]*"' | cut -d: -f2 | tr -d '" ' | sed 's/^v//')
+        # Get the latest release tag using GitHub API (fall back to releases page)
+        PYGO_VERSION=$(curl -sL "https://api.github.com/repos/$PYGO_REPO/releases/latest" | grep '"tag_name"' | head -1 | sed -E 's/.*"tag_name": *"v?([^"]+)".*/\1/')
         if [ -z "$PYGO_VERSION" ]; then
             echo -e "${RED}Failed to get latest version${NC}"
             exit 1
