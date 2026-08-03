@@ -1,0 +1,26 @@
+# PyGo Framework — Module Manifest
+name: pygo-framework
+version: 1.2.0
+description: "Full-stack framework generating native Python + Go code via .pgo DSL"
+category: core
+official: true
+license: AGPL-3.0
+
+repository:
+  type: git
+  url: https://github.com/pygo-labs/pygo-framework
+
+dependencies:
+  - name: Go 2.0+
+    type: runtime
+  - name: Python 3.12+
+    type: runtime
+  - name: Node.js 22+
+    type: dev
+
+features:
+  - isomorphic_python_go
+  - htmx_server_side
+  - dsl_compilation
+
+assets: []
