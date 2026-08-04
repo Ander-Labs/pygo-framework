@@ -11,7 +11,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/ander-labs/pygo/core/runtime/jobs"
+	"pygo-framework/core/runtime/jobs"
 )
 
 // Router adapts generated routes to the standard library net/http mux.

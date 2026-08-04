@@ -30,9 +30,9 @@ type Client struct {
 // Hub manages WebSocket connections
 type Hub struct {
 	clients    map[string]*Client
-	broadcast  make(chan []byte)
-	register   make(chan *Client)
-	unregister make chan *Client
+	broadcast  chan []byte
+	register   chan *Client
+	unregister chan *Client
 	mu         sync.RWMutex
 }
 

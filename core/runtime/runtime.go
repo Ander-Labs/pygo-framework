@@ -19,8 +19,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ander-labs/pygo/core/runtime/jobs"
-	"github.com/ander-labs/pygo/core/runtime/socket"
+	"pygo-framework/core/runtime/jobs"
+	"pygo-framework/core/runtime/socket"
 )
 
 // Config parameterizes a Supervisor.
