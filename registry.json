@@ -1,6 +1,70 @@
 {
   "modules": {
     "official": {
+      "i18n": {
+        "name": "pygo-i18n",
+        "version": "0.1.0",
+        "description": "Multi-language routing, automatic language detection, and template translation",
+        "author": "PyGo Labs",
+        "license": "MIT",
+        "official": true,
+        "url": "https://github.com/PyGo-Labs/pygo-i18n",
+        "downloads": 0,
+        "rating": 0,
+        "tags": ["i18n", "translation", "localization", "multi-language"],
+        "python_version": ">=3.12",
+        "pygo_version": ">=1.2.0",
+        "dependencies": [],
+        "category": "official-free"
+      },
+      "observability": {
+        "name": "pygo-observability",
+        "version": "0.1.0",
+        "description": "OpenTelemetry-compatible tracing, metrics, and log correlation (stdlib only)",
+        "author": "PyGo Labs",
+        "license": "MIT",
+        "official": true,
+        "url": "https://github.com/PyGo-Labs/pygo-observability",
+        "downloads": 0,
+        "rating": 0,
+        "tags": ["observability", "tracing", "metrics", "logging", "opentelemetry"],
+        "python_version": ">=3.12",
+        "pygo_version": ">=1.2.0",
+        "dependencies": [],
+        "category": "official-free"
+      },
+      "search": {
+        "name": "pygo-search",
+        "version": "0.1.0",
+        "description": "Meilisearch wrapper with auto-sync, fuzzy search, and multi-tenancy filtering",
+        "author": "PyGo Labs",
+        "license": "MIT",
+        "official": true,
+        "url": "https://github.com/PyGo-Labs/pygo-search",
+        "downloads": 0,
+        "rating": 0,
+        "tags": ["search", "meilisearch", "elasticsearch", "fuzzy-search", "multi-tenancy"],
+        "python_version": ">=3.12",
+        "pygo_version": ">=1.2.0",
+        "dependencies": [],
+        "category": "official-free"
+      },
+      "notifications": {
+        "name": "pygo-notifications",
+        "version": "0.1.0",
+        "description": "Unified notifications (email, SMS, push) with queue integration and retry logic",
+        "author": "PyGo Labs",
+        "license": "MIT",
+        "official": true,
+        "url": "https://github.com/PyGo-Labs/pygo-notifications",
+        "downloads": 0,
+        "rating": 0,
+        "tags": ["notifications", "email", "sms", "push", "twilio", "fcm", "smtp"],
+        "python_version": ">=3.12",
+        "pygo_version": ">=1.2.0",
+        "dependencies": [],
+        "category": "official-free"
+      },
       "auth": {
         "name": "pygo-module-auth",
         "version": "1.0.0",
@@ -77,7 +141,8 @@
   },
   "metadata": {
     "last_updated": "2024-07-31T12:00:00Z",
-    "total_modules": 6,
-    "total_downloads": 3300
+    "total_modules": 10,
+    "total_downloads": 3300,
+    "official_free": 4
   }
 }
