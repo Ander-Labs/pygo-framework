@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ander-labs/pygo/core/runtime"
-	"github.com/ander-labs/pygo/core/runtime/hotreload"
+	"pygo-framework/core/runtime"
+	"pygo-framework/core/runtime/hotreload"
 )
 
 // runDev is the real v0.2.0 flow: transpile, then start the native net/http
@@ -137,7 +137,7 @@ func transpile(frameworkRoot, input, outDir string) error {
 	// interactive prompt it can trigger). Build it on first use.
 	bin := filepath.Join(os.TempDir(), "pygo-transpile")
 	if _, err := os.Stat(bin); err != nil {
-		cmd := exec.Command("go", "build", "-o", bin, "./core/transpiler")
+		cmd := exec.Command("go", "build", "-o", bin, "./cmd/transpiler")
 		cmd.Dir = frameworkRoot
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr

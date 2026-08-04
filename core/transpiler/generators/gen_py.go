@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ander-labs/pygo/core/transpiler/ast"
+	"pygo-framework/core/transpiler/ast"
 )
 
 // PyGenerator is an ast.Visitor that produces Python source.
@@ -33,6 +33,7 @@ var pyTypeMap = map[string]string{
 	"Int":      "int",
 	"Float":    "float",
 	"Bool":     "bool",
+	"Boolean":  "bool",
 	"DateTime": "datetime",
 	"UUID":     "str",
 	"Decimal":  "Decimal",
@@ -70,6 +71,41 @@ func pyType(t *ast.TypeRef) string {
 		return base + " | None"
 	}
 	return base
+}
+
+// pyDefault converts Go-style default literals to Python equivalents.
+// Handles: true→True, false→False, null→None, and unquoted strings→quoted strings.
+func pyDefault(s string) string {
+	switch s {
+	case "true":
+		return "True"
+	case "false":
+		return "False"
+	case "null", "None":
+		return "None"
+	}
+	// Already quoted
+	if len(s) > 0 && (s[0] == '"' || s[0] == '\'') {
+		return s
+	}
+	// Number check — leaves numerics and Decimals untouched
+	if isNumeric(s) {
+		return s
+	}
+	// Treat unquoted non-numbers as string literals
+	return "\"" + s + "\""
+}
+
+func isNumeric(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range s {
+		if (c < '0' || c > '9') && c != '.' && c != '-' {
+			return false
+		}
+	}
+	return true
 }
 
 func (g *PyGenerator) VisitProgram(n *ast.Program) (interface{}, error) {
@@ -115,7 +151,7 @@ func (g *PyGenerator) VisitModel(n *ast.ModelNode) (interface{}, error) {
 	for _, f := range n.Fields {
 		line := fmt.Sprintf("    %s: %s", f.Name, pyType(f.Type))
 		if f.Default != "" {
-			line += " = " + f.Default
+			line += " = " + pyDefault(f.Default)
 		}
 		g.buf.WriteString(line + "\n")
 	}

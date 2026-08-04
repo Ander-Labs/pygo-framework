@@ -1,9 +1,5 @@
-// Command transpiler is the PyGo Fase 0 CLI: given a `.pgo` file it emits
-// gen_go.go and gen_py.py into the same directory (or a chosen output dir).
-//
-// Usage:
-//
-//	transpiler <path/to/file.pgo> [--out <dir>] [--pkg <goPackage>]
+// Command transpiler is the PyGo CLI transpiler: given a `.pgo` file it emits
+// gen_go.go and gen_py.py into the output directory.
 package main
 
 import (
@@ -12,9 +8,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ander-labs/pygo/core/transpiler/generators"
-	"github.com/ander-labs/pygo/core/transpiler/lexer"
-	"github.com/ander-labs/pygo/core/transpiler/parser"
+	"pygo-framework/core/transpiler/generators"
+	"pygo-framework/core/transpiler/lexer"
+	"pygo-framework/core/transpiler/parser"
 )
 
 func main() {
@@ -54,6 +50,7 @@ func run(inPath, outDir, pkg string) error {
 	if err != nil {
 		return fmt.Errorf("gen_go: %w", err)
 	}
+
 	pySrc, err := generators.GeneratePy(prog)
 	if err != nil {
 		return fmt.Errorf("gen_py: %w", err)
@@ -68,6 +65,7 @@ func run(inPath, outDir, pkg string) error {
 
 	goPath := filepath.Join(outDir, "gen_go.go")
 	pyPath := filepath.Join(outDir, "gen_py.py")
+
 	if err := os.WriteFile(goPath, []byte(goSrc), 0o644); err != nil {
 		return fmt.Errorf("write gen_go.go: %w", err)
 	}
